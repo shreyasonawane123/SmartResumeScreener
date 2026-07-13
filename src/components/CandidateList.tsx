@@ -105,7 +105,7 @@ export function CandidateList({ candidates, threshold, isLoading }: CandidateLis
         <div className="space-y-3">
           <div className="section-header-other">
             <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: "10px" }}>↳</span>
-            Not Shortlisted Candidates — {otherCandidates.length}
+            Not Shortlisted Candidates
           </div>
           <div className="space-y-3">
             {otherCandidates.map((candidate) => (

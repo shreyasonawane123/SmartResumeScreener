@@ -33,6 +33,37 @@ export async function insertResume(params: {
 }): Promise<StoredResume> {
   const db = getSupabaseClient();
 
+  // Check if a resume with the same filename for this job description already exists
+  const { data: existing, error: findError } = await db
+    .from("resumes")
+    .select("id")
+    .eq("job_description_id", params.job_description_id)
+    .eq("filename", params.filename)
+    .maybeSingle();
+
+  if (findError) {
+    throw new DbError(`Failed to check existing resume: ${findError.message}`, findError);
+  }
+
+  if (existing) {
+    // Overwrite the existing resume
+    const { data, error } = await db
+      .from("resumes")
+      .update({
+        raw_text: params.raw_text,
+        structured_json: params.structured_json,
+      })
+      .eq("id", existing.id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new DbError(`Failed to update existing resume: ${error.message}`, error);
+    }
+    return data as StoredResume;
+  }
+
+  // Otherwise, insert new
   const { data, error } = await db
     .from("resumes")
     .insert({

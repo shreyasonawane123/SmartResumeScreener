@@ -72,7 +72,7 @@ export function ResumeUploader({
       size: file.size,
       status: "idle" as const,
     }));
-    setUploadingFiles((prev) => [...prev, ...newUploads]);
+    setUploadingFiles(newUploads);
 
     for (let i = 0; i < validFiles.length; i++) {
       const file = validFiles[i];

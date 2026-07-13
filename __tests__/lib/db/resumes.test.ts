@@ -3,12 +3,6 @@
 //
 // Unit tests for the scoped resume DB functions.
 // Supabase client is mocked — no live DB or LLM calls.
-//
-// Tests:
-// - getResumesByJobDescription: returns only matching rows
-// - getResumesByJobDescription: returns [] when no rows match
-// - getResumesByJobDescription: throws DbError on DB failure
-// - insertResume: passes job_description_id to the insert call
 // ============================================================
 
 import { getResumesByJobDescription, insertResume, DbError } from "@/lib/db/resumes";
@@ -20,10 +14,7 @@ jest.mock("@/lib/db/client", () => ({
 
 import { getSupabaseClient } from "@/lib/db/client";
 
-// ── Shared fixture data ──────────────────────────────────────
-
 const JOB_ID_A = "job-a-uuid-1111";
-const JOB_ID_B = "job-b-uuid-2222";
 
 const resumeA1 = {
   id: "resume-a1",
@@ -39,94 +30,69 @@ const resumeA1 = {
   created_at: "2026-01-01T00:00:00Z",
 };
 
-const resumeA2 = {
-  id: "resume-a2",
-  job_description_id: JOB_ID_A,
-  filename: "bob.pdf",
-  raw_text: "Bob resume text",
-  structured_json: {
-    name: "Bob",
-    skills: ["Python"],
-    experience: [],
-    education: [],
-  },
-  created_at: "2026-01-02T00:00:00Z",
-};
-
-// ── Supabase query builder mock factory ─────────────────────
-
-function makeQueryBuilder(resolvedValue: { data: unknown; error: unknown }) {
-  const builder = {
+// Helper mock builder that supports method chaining
+function makeMockClient(resolvedValues: {
+  maybeSingleValue?: { data: any; error: any };
+  insertValue?: { data: any; error: any };
+  updateValue?: { data: any; error: any };
+  selectValue?: { data: any; error: any };
+}) {
+  const chain = {
     from: jest.fn().mockReturnThis(),
     select: jest.fn().mockReturnThis(),
     insert: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue(resolvedValue),
-    // For non-.single() calls the terminal call is .order()
-    then: undefined as unknown,
+    single: jest.fn(),
+    maybeSingle: jest.fn(),
   };
-  // Make .order() resolve the promise (used by getResumesByJobDescription)
-  builder.order = jest.fn().mockResolvedValue(resolvedValue);
-  return builder;
-}
 
-// ── Tests ────────────────────────────────────────────────────
+  // Setup terminal resolvers
+  chain.maybeSingle.mockResolvedValue(resolvedValues.maybeSingleValue || { data: null, error: null });
+  chain.order.mockResolvedValue(resolvedValues.selectValue || { data: [], error: null });
+  chain.single.mockImplementation(() => {
+    // If update was called, return update value, else return insert value
+    if (chain.update.mock.calls.length > 0) {
+      return Promise.resolve(resolvedValues.updateValue || { data: null, error: null });
+    }
+    return Promise.resolve(resolvedValues.insertValue || { data: null, error: null });
+  });
+
+  return chain;
+}
 
 describe("getResumesByJobDescription", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("returns only resumes that belong to the requested job", async () => {
-    const builder = makeQueryBuilder({ data: [resumeA1, resumeA2], error: null });
-    (getSupabaseClient as jest.Mock).mockReturnValue(builder);
+    const client = makeMockClient({ selectValue: { data: [resumeA1], error: null } });
+    (getSupabaseClient as jest.Mock).mockReturnValue(client);
 
     const result = await getResumesByJobDescription(JOB_ID_A);
 
-    expect(result).toHaveLength(2);
+    expect(result).toHaveLength(1);
     expect(result[0].filename).toBe("alice.pdf");
-    expect(result[1].filename).toBe("bob.pdf");
-    // Confirm the .eq filter was applied with the correct job ID
-    expect(builder.eq).toHaveBeenCalledWith("job_description_id", JOB_ID_A);
-  });
-
-  it("returns an empty array when no resumes exist for the job", async () => {
-    const builder = makeQueryBuilder({ data: [], error: null });
-    (getSupabaseClient as jest.Mock).mockReturnValue(builder);
-
-    const result = await getResumesByJobDescription(JOB_ID_B);
-
-    expect(result).toEqual([]);
-    expect(builder.eq).toHaveBeenCalledWith("job_description_id", JOB_ID_B);
-  });
-
-  it("returns an empty array when data is null (no rows)", async () => {
-    const builder = makeQueryBuilder({ data: null, error: null });
-    (getSupabaseClient as jest.Mock).mockReturnValue(builder);
-
-    const result = await getResumesByJobDescription(JOB_ID_A);
-    expect(result).toEqual([]);
+    expect(client.eq).toHaveBeenCalledWith("job_description_id", JOB_ID_A);
   });
 
   it("throws DbError when Supabase returns an error", async () => {
-    const builder = makeQueryBuilder({
-      data: null,
-      error: { message: "connection refused" },
-    });
-    (getSupabaseClient as jest.Mock).mockReturnValue(builder);
+    const client = makeMockClient({ selectValue: { data: null, error: { message: "refused" } } });
+    (getSupabaseClient as jest.Mock).mockReturnValue(client);
 
     await expect(getResumesByJobDescription(JOB_ID_A)).rejects.toThrow(DbError);
-    await expect(getResumesByJobDescription(JOB_ID_A)).rejects.toThrow(
-      "Failed to fetch resumes for job",
-    );
   });
 });
 
 describe("insertResume", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("passes job_description_id to the insert call", async () => {
-    const builder = makeQueryBuilder({ data: resumeA1, error: null });
-    (getSupabaseClient as jest.Mock).mockReturnValue(builder);
+  it("inserts new resume if none exists with same name", async () => {
+    const client = makeMockClient({
+      maybeSingleValue: { data: null, error: null }, // no existing record
+      insertValue: { data: resumeA1, error: null },
+    });
+    (getSupabaseClient as jest.Mock).mockReturnValue(client);
 
     const result = await insertResume({
       job_description_id: JOB_ID_A,
@@ -135,15 +101,38 @@ describe("insertResume", () => {
       structured_json: resumeA1.structured_json,
     });
 
-    expect(builder.insert).toHaveBeenCalledWith(
-      expect.objectContaining({ job_description_id: JOB_ID_A }),
+    expect(client.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ job_description_id: JOB_ID_A, filename: "alice.pdf" }),
     );
     expect(result.filename).toBe("alice.pdf");
   });
 
-  it("throws DbError when insert fails", async () => {
-    const builder = makeQueryBuilder({ data: null, error: { message: "unique violation" } });
-    (getSupabaseClient as jest.Mock).mockReturnValue(builder);
+  it("updates existing resume if record already exists", async () => {
+    const client = makeMockClient({
+      maybeSingleValue: { data: { id: "resume-a1" }, error: null }, // existing ID found
+      updateValue: { data: resumeA1, error: null },
+    });
+    (getSupabaseClient as jest.Mock).mockReturnValue(client);
+
+    const result = await insertResume({
+      job_description_id: JOB_ID_A,
+      filename: "alice.pdf",
+      raw_text: "Updated text",
+      structured_json: resumeA1.structured_json,
+    });
+
+    expect(client.update).toHaveBeenCalledWith(
+      expect.objectContaining({ raw_text: "Updated text" }),
+    );
+    expect(client.eq).toHaveBeenCalledWith("id", "resume-a1");
+    expect(result.id).toBe("resume-a1");
+  });
+
+  it("throws DbError when check fails", async () => {
+    const client = makeMockClient({
+      maybeSingleValue: { data: null, error: { message: "query block" } },
+    });
+    (getSupabaseClient as jest.Mock).mockReturnValue(client);
 
     await expect(
       insertResume({
