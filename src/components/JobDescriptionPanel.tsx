@@ -255,7 +255,7 @@ export function JobDescriptionPanel({
                 value={threshold}
                 onChange={(e) => onThresholdChange(Number(e.target.value))}
                 disabled={isAnalyzing}
-                className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
+                className="flex-1 cursor-pointer"
                 style={{ accentColor: "var(--text-primary)" }}
               />
               <input
