@@ -1,20 +1,21 @@
 // ============================================================
 // lib/llm/extract.ts
 //
-// Calls the LLM to extract structured data from resume text.
-// Uses Anthropic tool_use to force a typed JSON response —
-// this is more reliable than parsing prose for a JSON block.
+// Calls Google's Gemini API to extract structured data from resume text.
+// Uses Gemini's responseMimeType: "application/json" and responseSchema
+// configuration to force the model to return valid structured JSON.
 //
 // Retry logic: if Zod validation fails on the first attempt,
 // we send the validation error back to the model and ask it to
 // correct its output. Max 2 attempts total.
 // ============================================================
 
-import { getAnthropicClient, MODEL_ID } from "./client";
+import { getGeminiClient, MODEL_ID } from "./client";
 import { EXTRACTION_SYSTEM_PROMPT, EXTRACTION_USER_PROMPT } from "./prompts";
 import { ResumeDataSchema } from "@/lib/schemas";
 import type { ResumeData } from "@/lib/types";
 import { LLM_MAX_RETRIES } from "@/lib/constants";
+import { Schema } from "@google/generative-ai";
 
 export class ExtractionError extends Error {
   constructor(
@@ -26,102 +27,87 @@ export class ExtractionError extends Error {
   }
 }
 
-import Anthropic from "@anthropic-ai/sdk";
-
-// The tool definition tells Claude exactly what JSON shape to emit.
-// tool_use is more reliable than asking for JSON in a system prompt
-// because the model is explicitly constrained to the input_schema.
-const EXTRACTION_TOOL: Anthropic.Messages.Tool = {
-  name: "extract_resume_data",
-  description: "Extract structured information from resume text and return as JSON.",
-  input_schema: {
-    type: "object",
-    properties: {
-      name: { type: "string", description: "Candidate full name" },
-      skills: {
-        type: "array",
-        items: { type: "string" },
-        description: "Technical and soft skills",
-      },
-      experience: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            role: { type: "string" },
-            company: { type: "string" },
-            years: { type: "number" },
-          },
-          required: ["role", "company", "years"],
+// Gemini Schema defining the expected output structure.
+// Using string literals instead of the Type enum avoids Jest ESM/CJS import issues.
+const EXTRACTION_SCHEMA: Schema = {
+  type: "object" as any,
+  properties: {
+    name: { type: "string" as any, description: "Candidate full name" },
+    skills: {
+      type: "array" as any,
+      items: { type: "string" as any },
+      description: "Technical and soft skills",
+    },
+    experience: {
+      type: "array" as any,
+      items: {
+        type: "object" as any,
+        properties: {
+          role: { type: "string" as any },
+          company: { type: "string" as any },
+          years: { type: "number" as any },
         },
-      },
-      education: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            degree: { type: "string" },
-            institution: { type: "string" },
-          },
-          required: ["degree", "institution"],
-        },
+        required: ["role", "company", "years"],
       },
     },
-    required: ["name", "skills", "experience", "education"],
+    education: {
+      type: "array" as any,
+      items: {
+        type: "object" as any,
+        properties: {
+          degree: { type: "string" as any },
+          institution: { type: "string" as any },
+        },
+        required: ["degree", "institution"],
+      },
+    },
   },
+  required: ["name", "skills", "experience", "education"],
 };
 
 /**
- * Extract structured resume data from raw text using the LLM.
+ * Extract structured resume data from raw text using Gemini.
  * Validates the output with Zod and retries once if validation fails.
  *
- * @throws {ExtractionError} if both attempts fail (LLM error or invalid JSON schema)
+ * @throws {ExtractionError} if both attempts fail
  */
 export async function extractResumeData(resumeText: string): Promise<ResumeData> {
-  const client = getAnthropicClient();
+  const client = getGeminiClient();
 
-  // Build the initial message list — may be extended on retry
-  const messages: Array<{ role: "user" | "assistant"; content: string }> = [
-    { role: "user", content: EXTRACTION_USER_PROMPT(resumeText) },
-  ];
+  // Initialize conversations with system instructions
+  const model = client.getGenerativeModel({
+    model: MODEL_ID,
+    systemInstruction: EXTRACTION_SYSTEM_PROMPT,
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: EXTRACTION_SCHEMA,
+    },
+  });
 
+  const chat = model.startChat({
+    history: [],
+  });
+
+  let nextPrompt = EXTRACTION_USER_PROMPT(resumeText);
   let lastError: string | null = null;
 
   for (let attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
-    // On retry, append the validation error so the model can self-correct
     if (attempt > 0 && lastError) {
-      messages.push({
-        role: "user",
-        content: `Your previous response failed schema validation with this error: "${lastError}". Please correct the JSON and try again.`,
-      });
+      nextPrompt = `Your previous response failed schema validation with this error: "${lastError}". Please correct the JSON and try again.`;
     }
 
     let rawInput: unknown;
     try {
-      const response = await client.messages.create({
-        model: MODEL_ID,
-        max_tokens: 2048,
-        system: EXTRACTION_SYSTEM_PROMPT,
-        tools: [EXTRACTION_TOOL],
-        tool_choice: { type: "tool", name: "extract_resume_data" },
-        messages,
-      });
-
-      // Find the tool_use block in the response
-      const toolUseBlock = response.content.find(
-        (block): block is Extract<typeof block, { type: "tool_use" }> =>
-          block.type === "tool_use",
-      );
-
-      if (!toolUseBlock) {
-        throw new ExtractionError("LLM response did not contain a tool_use block.");
+      const response = await chat.sendMessage(nextPrompt);
+      const text = response.response.text();
+      if (!text) {
+        throw new ExtractionError("Gemini response did not contain text.");
       }
-
-      rawInput = toolUseBlock.input;
+      rawInput = JSON.parse(text);
     } catch (err) {
       if (err instanceof ExtractionError) throw err;
       throw new ExtractionError(
-        `LLM call failed: ${err instanceof Error ? err.message : "unknown error"}`,
+        `Gemini API call failed: ${err instanceof Error ? err.message : "unknown error"}`,
         err,
       );
     }
@@ -144,6 +130,5 @@ export async function extractResumeData(resumeText: string): Promise<ResumeData>
     }
   }
 
-  // TypeScript requires a return here, but the loop always returns or throws
   throw new ExtractionError("Extraction failed unexpectedly.");
 }

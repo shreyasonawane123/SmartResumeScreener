@@ -18,16 +18,16 @@ An evaluation tool that handles structured resume parsing and match scoring agai
                      +-----+---------+----+
                            |         |
       2. Parse & Extract   |         | 3. Store Structured
-      (Claude Tool Use)    v         |    Data & Scores
+      (Gemini JSON Schema) v         |    Data & Scores
                      +-----+---------+----+
-                     |  Anthropic API     | <--->  Supabase DB
-                     |  (claude-sonnet-5) |        (PostgreSQL)
+                     |  Google Gemini API | <--->  Supabase DB
+                     | (gemini-2.0-flash) |        (PostgreSQL)
                      +--------------------+
 ```
 
 ### Separation of Concerns
 - **`/src/lib/parsing/`**: Handles text extraction from uploads. Relies on `unpdf` instead of the traditional `pdf-parse` package because `unpdf` compiles with zero native binary bindings, preventing canvas dependency load failures in Vercel's serverless environment.
-- **`/src/lib/llm/`**: Manages the LLM client configuration, prompt structures, and Anthropic tool configurations.
+- **`/src/lib/llm/`**: Manages the Gemini client configuration, prompt structures, and native JSON response schema mappings.
 - **`/src/lib/db/`**: Handles direct Supabase CRUD database transactions.
 - **`/src/app/api/`**: Simple request/response route endpoints. All logic is decoupled into `/lib` so that parsing, scoring, and database transactions can be unit tested without spawning the Next.js runtime.
 - **`/src/components/`**: Clean Tailwind UI components. Stateful dashboard assembly is delegated to `src/app/page.tsx` to keep individual components highly reusable.
@@ -35,7 +35,7 @@ An evaluation tool that handles structured resume parsing and match scoring agai
 ### Shortlisting Logic
 - **How it works**: The default pass-mark threshold is stored in [`src/lib/constants.ts`](file:///src/lib/constants.ts) as `DEFAULT_SHORTLIST_THRESHOLD` (currently 7/10).
 - **Client-Side Partitioning**: When a user changes the slider threshold on the dashboard, the list is re-partitioned into "Shortlisted" and "Other Candidates" instantly in the browser. This avoids expensive re-scoring LLM calls and database queries.
-- **Requirement Fit**: This design directly satisfies the assignment's mandate to "display shortlisted candidates" with justification, visually elevating top fits while keeping the full candidate pool browsable.
+- **Requirement Fit**: This design directly satisfies the assignment's mandate to "display shortlisted candidates" with justification, visually elevating top fits while keeping the full pool browsable.
 
 ---
 
@@ -48,13 +48,13 @@ Both prompts are defined in [`src/lib/llm/prompts.ts`](file:///src/lib/llm/promp
 ### 1. Resume Extraction Prompt
 Converts raw, unstructured resume text into a structured profile schema.
 - **Why it's structured this way**: It provides an explicit TypeScript-mirror output schema, a few-shot worked example to align format expectations (especially converting text durations into numbers), and instructions to reason step-by-step internally.
-- **Tool Use Constraints**: Rather than relying on Claude to output valid JSON in markdown blocks, we use the Anthropic Tool Use API, forcing the model to respond by calling a schema-validated tool: `extract_resume_data`.
-- **Validation & Retry**: The backend validates the model's output using Zod. If the model outputs bad schema structures, the system automatically retries once by appending the Zod validation issues back to the prompt, allowing the model to self-correct.
+- **Structured JSON Schema**: Rather than relying on Gemini to output valid JSON in markdown prose blocks, we configure the request with `responseMimeType: "application/json"` and define a strict `responseSchema` on the SDK client, forcing the model to output a schema-validated object.
+- **Validation & Retry**: The backend validates the model's output using Zod. If the model outputs bad schema structures, the system automatically retries once by sending the Zod validation issues back in the chat thread, allowing the model to self-correct.
 
 ### 2. Candidate Scoring Prompt
 Rates candidate fit on a 1–10 scale against a job description.
 - **Why it's structured this way**: Inputs are passed as pre-structured JSON (reducing noise). It specifies score calibration (1–3 for major gaps, 4–6 for partial fit, 7–8 for good fit, 9–10 for excellent fit) to prevent score drift, and requires both matched and missing skill lists to drive frontend chips.
-- **Tool Use Constraints**: Forces response using the `score_candidate` tool.
+- **Structured JSON Schema**: Configured with `responseSchema` on the client.
 
 ---
 
@@ -72,7 +72,7 @@ Copy the template to create a local environment file:
 cp .env.example .env.local
 ```
 Fill in the credentials in `.env.local`:
-- `ANTHROPIC_API_KEY`: Your Anthropic developer console API key.
+- `GEMINI_API_KEY`: Get a free key at [Google AI Studio](https://aistudio.google.com/) (no credit card required).
 - `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
 - `SUPABASE_SERVICE_ROLE_KEY`: Service role API key (used server-side for database write bypass).
 

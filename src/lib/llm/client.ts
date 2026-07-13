@@ -1,31 +1,34 @@
 // ============================================================
 // lib/llm/client.ts
 //
-// Anthropic SDK singleton. Centralizing the client here means:
-// - API key validation happens once at startup (fast fail)
-// - Tests can mock this module without touching individual callers
+// Gemini SDK singleton.
+// centralizes initialization and validates the GEMINI_API_KEY.
 // ============================================================
 
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-let _client: Anthropic | null = null;
+let _client: GoogleGenerativeAI | null = null;
 
-export function getAnthropicClient(): Anthropic {
+/**
+ * Get the Google Generative AI client singleton.
+ * @throws {Error} if GEMINI_API_KEY is not configured
+ */
+export function getGeminiClient(): GoogleGenerativeAI {
   if (_client) return _client;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to .env.local (see .env.example).",
+      "GEMINI_API_KEY is not set. Add it to .env.local (see .env.example).",
     );
   }
 
-  _client = new Anthropic({ apiKey });
+  _client = new GoogleGenerativeAI(apiKey);
   return _client;
 }
 
 /**
- * The specific model we use throughout the app.
- * Defined once so it's easy to change for a demo or evaluation.
+ * The standard model for fast, structured JSON text generation.
+ * gemini-2.0-flash is fully active on the free tier.
  */
-export const MODEL_ID = "claude-sonnet-4-5";
+export const MODEL_ID = "gemini-2.0-flash";
