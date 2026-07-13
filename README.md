@@ -21,21 +21,22 @@ An evaluation tool that handles structured resume parsing and match scoring agai
       (Groq JSON mode)     v         |    Data & Scores
                      +-----+---------+----+
                      |     Groq API       | <--->  Supabase DB
-                     | (llama-3.3-70b)    |        (PostgreSQL)
+                     | (llama-3.3-70b-   |        (PostgreSQL)
+                     |   versatile)       |
                      +--------------------+
 ```
 
 ### Separation of Concerns
-- **`/src/lib/parsing/`**: Handles text extraction from uploads. Relies on `unpdf` instead of the traditional `pdf-parse` package because `unpdf` compiles with zero native binary bindings, preventing canvas dependency load failures in Vercel's serverless environment.
-- **`/src/lib/llm/`**: Manages the Groq client configuration, prompt structures, and JSON mode response handling.
+- **`/src/lib/parsing/`**: Handles text extraction from uploads. Relies on `unpdf` instead of the traditional `pdf-parse` package because `unpdf` compiles with zero native binary bindings, preventing canvas dependency load failures in Vercel serverless environments.
+- **`/src/lib/llm/`**: Manages the Groq client configuration, prompt structures, and structured output handling via `response_format: { type: "json_schema" }` — which forces the model to emit valid, schema-constrained JSON without relying on markdown prose blocks.
 - **`/src/lib/db/`**: Handles direct Supabase CRUD database transactions.
 - **`/src/app/api/`**: Simple request/response route endpoints. All logic is decoupled into `/lib` so that parsing, scoring, and database transactions can be unit tested without spawning the Next.js runtime.
 - **`/src/components/`**: Clean Tailwind UI components. Stateful dashboard assembly is delegated to `src/app/page.tsx` to keep individual components highly reusable.
 
 ### Shortlisting Logic
-- **How it works**: The default pass-mark threshold is stored in [`src/lib/constants.ts`](file:///src/lib/constants.ts) as `DEFAULT_SHORTLIST_THRESHOLD` (currently 7/10).
+- **How it works**: The default pass-mark threshold is stored in `src/lib/constants.ts` as `DEFAULT_SHORTLIST_THRESHOLD` (currently 7/10).
 - **Client-Side Partitioning**: When a user changes the slider threshold on the dashboard, the list is re-partitioned into "Shortlisted" and "Other Candidates" instantly in the browser. This avoids expensive re-scoring LLM calls and database queries.
-- **Requirement Fit**: This design directly satisfies the assignment's mandate to "display shortlisted candidates" with justification, visually elevating top fits while keeping the full pool browsable.
+- **Requirement Fit**: This design directly satisfies the assignment mandate to "display shortlisted candidates" with justification, visually elevating top fits while keeping the full pool browsable.
 
 ---
 
@@ -43,55 +44,71 @@ An evaluation tool that handles structured resume parsing and match scoring agai
 
 The app uses two separate prompts rather than one mega-prompt. This keeps individual tasks simple for the model, reduces token usage on re-scoring, and makes it easy to explain or audit.
 
-Both prompts are defined in [`src/lib/llm/prompts.ts`](file:///src/lib/llm/prompts.ts).
+Both prompts are defined in `src/lib/llm/prompts.ts`.
 
 ### 1. Resume Extraction Prompt
 Converts raw, unstructured resume text into a structured profile schema.
 - **Why it's structured this way**: It provides an explicit TypeScript-mirror output schema, a few-shot worked example to align format expectations (especially converting text durations into numbers), and instructions to reason step-by-step internally.
-- **Structured JSON Mode**: Rather than relying on the model to output valid JSON in markdown prose blocks, we configure the Groq request with `response_format: { type: "json_object" }`, forcing the model to output valid JSON.
+- **Structured JSON Schema**: Rather than relying on the model to output valid JSON in markdown prose blocks, we configure the Groq request with `response_format: { type: "json_schema", json_schema: { ... } }`, which instructs the model to produce output strictly conforming to a declared JSON Schema object. This is Groq's constrained-generation mode — analogous to OpenAI's structured outputs — and is more reliable than plain `json_object` mode because the schema itself is enforced, not just JSON syntax.
 - **Validation & Retry**: The backend validates the model's output using Zod. If the model outputs bad schema structures, the system automatically retries once by sending the Zod validation issues back in the message thread, allowing the model to self-correct.
 
 ### 2. Candidate Scoring Prompt
-Rates candidate fit on a 1â€“10 scale against a job description.
-- **Why it's structured this way**: Inputs are passed as pre-structured JSON (reducing noise). It specifies score calibration (1â€“3 for major gaps, 4â€“6 for partial fit, 7â€“8 for good fit, 9â€“10 for excellent fit) to prevent score drift, and requires both matched and missing skill lists to drive frontend chips.
-- **Structured JSON Mode**: Configured with `response_format: { type: "json_object" }` on the request.
+Rates candidate fit on a 1–10 scale against a job description.
+- **Why it's structured this way**: Inputs are passed as pre-structured JSON (reducing noise). It specifies score calibration (1–3 for major gaps, 4–6 for partial fit, 7–8 for good fit, 9–10 for excellent fit) to prevent score drift, and requires both matched and missing skill lists to drive frontend chips.
+- **Structured JSON Schema**: Configured with `response_format: { type: "json_schema", json_schema: { ... } }` on the request, enforcing that the score, justification, matched skills, and missing skills fields are all present and correctly typed in the model's response.
 
 ---
 
 ## Setup & Running Locally
 
-### 1. Database Setup
-Create a free project at [supabase.com](https://supabase.com). Go to the SQL Editor and execute the schema stub found in [`supabase/schema.sql`](file:///supabase/schema.sql). This will provision:
-- `resumes` table: Stores filename, raw text, and structured profile JSON.
-- `job_descriptions` table: Stores titles and requirements.
-- `scores` table: Stores computed scores, justifications, matched, and missing skills.
+> **Prerequisites**: Node.js 18 or later and npm 9 or later (bundled with Node 18+). All commands use `npm` — do not mix with `yarn` or `pnpm` to avoid lockfile conflicts.
 
-### 2. Environment Configuration
+### 1. Clone the Repository
+```bash
+git clone <your-repo-url>
+cd smart-resume-screener
+```
+
+### 2. Database Setup
+1. Create a free project at [supabase.com](https://supabase.com) (no credit card required).
+2. Once your project is ready, go to **SQL Editor** in the Supabase dashboard.
+3. Paste the full contents of `supabase/schema.sql` into the editor and click **Run**.
+
+This will provision three tables:
+- **`job_descriptions`** — Stores job titles and requirements text.
+- **`resumes`** — Stores filename, raw text, and structured profile JSON. Includes a `job_description_id` foreign key (`references job_descriptions(id) ON DELETE CASCADE`) so that every resume is permanently scoped to the job it was uploaded for — not a shared global pool. Switching to a different job description only shows candidates uploaded for that specific role.
+- **`scores`** — Stores computed scores, justifications, matched skills, and missing skills for each resume/job pair.
+
+### 3. Environment Configuration
 Copy the template to create a local environment file:
 ```bash
 cp .env.example .env.local
 ```
-Fill in the credentials in `.env.local`:
-- `GROQ_API_KEY`: Get a free key (no credit card required) at [console.groq.com](https://console.groq.com).
-- `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
-- `SUPABASE_SERVICE_ROLE_KEY`: Service role API key (used server-side for database write bypass).
 
-### 3. Install & Run
-Install packages:
+Fill in the credentials in `.env.local`:
+
+| Variable | How to get it |
+|---|---|
+| `GROQ_API_KEY` | Go to [console.groq.com](https://console.groq.com), sign up, go to **API Keys**, and create a new key. No credit card required. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Found in your Supabase project under **Settings ? API ? Project URL**. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Found under **Settings ? API ? service_role** secret key. Used server-side only to bypass Row Level Security for writes. Never expose this in client-side code. |
+
+### 4. Install Dependencies
 ```bash
 npm install
 ```
-Start the Next.js development server:
+
+### 5. Start the Development Server
 ```bash
 npm run dev
 ```
-Open `http://localhost:3000` to view the dashboard.
+Open [http://localhost:3000](http://localhost:3000) to view the dashboard.
 
 ---
 
 ## Testing & Verifying
 
-We write unit tests to verify parsing, validation retries, and scoring.
+Unit tests verify parsing, validation retries, and scoring logic.
 
 Run the test suite:
 ```bash
@@ -107,7 +124,7 @@ npm run type-check
 
 ## Data Model: Job-Scoped Resumes
 
-By design, candidate resumes are scoped directly to a specific job description (`job_description_id` column in the `resumes` table). 
+By design, candidate resumes are scoped directly to a specific job description (`job_description_id` column in the `resumes` table).
 - This matches a real-world recruiting workflow, where candidates apply to a specific open requisition rather than a global pool scored against arbitrary jobs.
 - Selecting a saved job description instantly filters the candidates to only show those uploaded for that specific role.
 - Uploads are disabled until a job description is active to prevent orphaned candidate records.
@@ -119,3 +136,5 @@ By design, candidate resumes are scoped directly to a specific job description (
 - **Scanned Resumes**: The PDF text extractor runs entirely in memory without OCR. Scanned/image-only PDFs will fail with an extraction warning. Resumes must contain extractable text characters.
 - **API Call Timeouts**: Scoring is performed sequentially. In production environments with a high volume of resumes, serverless function timeouts (typically 10s on Vercel Hobby plan) can be triggered. For larger batches, this should be refactored into a background worker queue.
 - **Tokens/Cost**: Running two-stage LLM extraction and scoring calls on every upload accumulates token usage. The app mitigates this by storing structured JSON in Supabase so scoring can be run and adjusted without re-extracting resume structures.
+- **Groq Free-Tier Rate Limits**: Groq's free tier enforces per-minute limits (approximately 30 requests/min and 6,000 tokens/min on `llama-3.3-70b-versatile`). When scoring multiple candidates in one batch, the app introduces a small sequential delay between Groq calls to stay within these limits. If you hit a rate-limit error, wait 60 seconds and retry.
+- **Per-Job Candidate Scoping**: Resumes are intentionally tied to the job description they were uploaded under — there is no shared candidate pool across postings. This mirrors how a real recruiting workflow operates (candidates apply to a specific role), but it means a resume must be re-uploaded if you want to evaluate the same person against a different job opening.
