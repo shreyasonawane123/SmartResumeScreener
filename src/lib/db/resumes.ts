@@ -34,26 +34,33 @@ export async function insertResume(params: {
   const db = getSupabaseClient();
 
   // Check if a resume with the same filename for this job description already exists
-  const { data: existing, error: findError } = await db
+  const { data: existingList, error: findError } = await db
     .from("resumes")
     .select("id")
     .eq("job_description_id", params.job_description_id)
-    .eq("filename", params.filename)
-    .maybeSingle();
+    .eq("filename", params.filename);
 
   if (findError) {
-    throw new DbError(`Failed to check existing resume: ${findError.message}`, findError);
+    throw new DbError(`Failed to check existing resumes: ${findError.message}`, findError);
   }
 
-  if (existing) {
-    // Overwrite the existing resume
+  if (existingList && existingList.length > 0) {
+    const primaryId = existingList[0].id;
+
+    // Clean up any extra duplicates that were inserted prior to deduplication
+    if (existingList.length > 1) {
+      const idsToDelete = existingList.slice(1).map((r) => r.id);
+      await db.from("resumes").delete().in("id", idsToDelete);
+    }
+
+    // Overwrite the primary existing resume
     const { data, error } = await db
       .from("resumes")
       .update({
         raw_text: params.raw_text,
         structured_json: params.structured_json,
       })
-      .eq("id", existing.id)
+      .eq("id", primaryId)
       .select()
       .single();
 

@@ -30,9 +30,9 @@ const resumeA1 = {
   created_at: "2026-01-01T00:00:00Z",
 };
 
-// Helper mock builder that supports method chaining
+// Helper mock builder that supports chainable queries and acts as a Thenable promise.
 function makeMockClient(resolvedValues: {
-  maybeSingleValue?: { data: any; error: any };
+  checkValue?: { data: any; error: any };
   insertValue?: { data: any; error: any };
   updateValue?: { data: any; error: any };
   selectValue?: { data: any; error: any };
@@ -42,22 +42,25 @@ function makeMockClient(resolvedValues: {
     select: jest.fn().mockReturnThis(),
     insert: jest.fn().mockReturnThis(),
     update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis(),
+    in: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
-    single: jest.fn(),
-    maybeSingle: jest.fn(),
+    single: jest.fn().mockReturnThis(),
+    then: jest.fn().mockImplementation((onFulfilled) => {
+      let val = { data: [], error: null };
+      if (chain.insert.mock.calls.length > 0) {
+        val = resolvedValues.insertValue || { data: null, error: null };
+      } else if (chain.update.mock.calls.length > 0) {
+        val = resolvedValues.updateValue || { data: null, error: null };
+      } else if (chain.order.mock.calls.length > 0) {
+        val = resolvedValues.selectValue || { data: [], error: null };
+      } else {
+        val = resolvedValues.checkValue || { data: [], error: null };
+      }
+      return Promise.resolve(val).then(onFulfilled);
+    }),
   };
-
-  // Setup terminal resolvers
-  chain.maybeSingle.mockResolvedValue(resolvedValues.maybeSingleValue || { data: null, error: null });
-  chain.order.mockResolvedValue(resolvedValues.selectValue || { data: [], error: null });
-  chain.single.mockImplementation(() => {
-    // If update was called, return update value, else return insert value
-    if (chain.update.mock.calls.length > 0) {
-      return Promise.resolve(resolvedValues.updateValue || { data: null, error: null });
-    }
-    return Promise.resolve(resolvedValues.insertValue || { data: null, error: null });
-  });
 
   return chain;
 }
@@ -89,7 +92,7 @@ describe("insertResume", () => {
 
   it("inserts new resume if none exists with same name", async () => {
     const client = makeMockClient({
-      maybeSingleValue: { data: null, error: null }, // no existing record
+      checkValue: { data: [], error: null }, // no existing record
       insertValue: { data: resumeA1, error: null },
     });
     (getSupabaseClient as jest.Mock).mockReturnValue(client);
@@ -109,7 +112,7 @@ describe("insertResume", () => {
 
   it("updates existing resume if record already exists", async () => {
     const client = makeMockClient({
-      maybeSingleValue: { data: { id: "resume-a1" }, error: null }, // existing ID found
+      checkValue: { data: [{ id: "resume-a1" }], error: null }, // existing record found
       updateValue: { data: resumeA1, error: null },
     });
     (getSupabaseClient as jest.Mock).mockReturnValue(client);
@@ -128,9 +131,31 @@ describe("insertResume", () => {
     expect(result.id).toBe("resume-a1");
   });
 
+  it("cleans up duplicates and updates the first one if multiple exist", async () => {
+    const client = makeMockClient({
+      checkValue: { data: [{ id: "resume-a1" }, { id: "resume-a2-dup" }], error: null }, // duplicates found
+      updateValue: { data: resumeA1, error: null },
+    });
+    (getSupabaseClient as jest.Mock).mockReturnValue(client);
+
+    const result = await insertResume({
+      job_description_id: JOB_ID_A,
+      filename: "alice.pdf",
+      raw_text: "Updated text",
+      structured_json: resumeA1.structured_json,
+    });
+
+    expect(client.delete).toHaveBeenCalled();
+    expect(client.in).toHaveBeenCalledWith("id", ["resume-a2-dup"]);
+    expect(client.update).toHaveBeenCalledWith(
+      expect.objectContaining({ raw_text: "Updated text" }),
+    );
+    expect(result.id).toBe("resume-a1");
+  });
+
   it("throws DbError when check fails", async () => {
     const client = makeMockClient({
-      maybeSingleValue: { data: null, error: { message: "query block" } },
+      checkValue: { data: null, error: { message: "query block" } },
     });
     (getSupabaseClient as jest.Mock).mockReturnValue(client);
 
