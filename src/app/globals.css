@@ -5,50 +5,50 @@
 @tailwind utilities;
 
 /* ============================================================
-   Design tokens — Candidate Dossier aesthetic (Cooler Paper Edition).
-   Cooler off-white background, strong near-black text, warm tan
-   borders, dividers, and secondary label accents.
+   Design tokens — Candidate Dossier: Premium Manila Archival.
+   Soft ivory base, sand-folder panels, crisp white cards, and
+   graphite ink text. Tan borders and stamp red / sage / clay accents.
    ============================================================ */
 :root {
-  /* Cooler off-white paper backgrounds */
-  --bg-base:        #F5F4F0;   /* cool off-white paper */
-  --bg-surface:     #EDECE6;   /* slightly darker cool grey-beige for panels/header */
-  --bg-card:        #FAF9F6;   /* clean paper white card surface */
-  --bg-card-hover:  #F2F1EC;   /* subtle hover state */
-  --bg-input:       #FAF9F6;   /* clean paper white inputs */
+  /* Manila Archival backgrounds */
+  --bg-base:        #FAF8F5;   /* soft premium ivory paper */
+  --bg-surface:     #F2ECE0;   /* sand-colored folder surface for panels/header */
+  --bg-card:        #FFFFFF;   /* crisp white card paper */
+  --bg-card-hover:  #FAF7F2;   /* very subtle hover shading */
+  --bg-input:       #FFFFFF;   /* clean white inputs */
 
-  /* Strong near-black ink / text */
-  --text-primary:   #171512;   /* strong near-black main ink */
-  --text-secondary: #423E38;   /* charcoal secondary ink */
-  --text-muted:     #8C8273;   /* warm tan-brown for metadata/label secondary text */
+  /* Graphite ink / text */
+  --text-primary:   #1E2229;   /* dark graphite ink */
+  --text-secondary: #4D535E;   /* charcoal secondary ink */
+  --text-muted:     #8F8677;   /* warm sand-grey for metadata/labels */
 
-  /* Structural lines — warm tan / brown hairline borders */
-  --border:         rgba(140, 130, 115, 0.22); /* warm tan border */
-  --border-strong:  rgba(140, 130, 115, 0.42); /* stronger tan divider */
-  --border-focus:   rgba(23, 21, 18, 0.70);    /* near-black focus borders */
+  /* Structural lines — warm tan borders */
+  --border:         rgba(168, 158, 142, 0.26); /* warm tan border */
+  --border-strong:  rgba(168, 158, 142, 0.48); /* stronger tan divider */
+  --border-focus:   rgba(30, 34, 41, 0.70);    /* graphite focus border */
 
   /* Stamp red — ONLY for shortlist marking */
-  --stamp-red:      #B23A2E;
-  --stamp-red-dim:  rgba(178, 58, 46, 0.10);
+  --stamp-red:      #C83C32;   /* bold ink stamp red */
+  --stamp-red-dim:  rgba(200, 60, 50, 0.08);
 
   /* Matched skills — sage green */
-  --skill-matched-bg:     rgba(92, 122, 92, 0.10);
-  --skill-matched-text:   #3D6B3D;
-  --skill-matched-border: rgba(92, 122, 92, 0.30);
+  --skill-matched-bg:     rgba(92, 122, 92, 0.09);
+  --skill-matched-text:   #3B663B;
+  --skill-matched-border: rgba(92, 122, 92, 0.26);
 
   /* Missing skills — muted clay */
   --skill-missing-bg:     rgba(166, 107, 79, 0.08);
-  --skill-missing-text:   #8B4A2E;
-  --skill-missing-border: rgba(166, 107, 79, 0.25);
+  --skill-missing-text:   #8B4528;
+  --skill-missing-border: rgba(166, 107, 79, 0.22);
 
   /* Score gauge palette */
-  --gauge-track:    rgba(23, 21, 18, 0.08);
-  --gauge-low:      #B23A2E;
+  --gauge-track:    rgba(30, 34, 41, 0.06);
+  --gauge-low:      #C83C32;
   --gauge-mid:      #A66B4F;
   --gauge-high:     #5C7A5C;
 
   /* Status states */
-  --error:          #B23A2E;
+  --error:          #C83C32;
   --success:        #5C7A5C;
   --warning:        #A66B4F;
 }
@@ -79,8 +79,8 @@
         0deg,
         transparent,
         transparent 24px,
-        rgba(23, 21, 18, 0.015) 24px,
-        rgba(23, 21, 18, 0.015) 25px
+        rgba(30, 34, 41, 0.015) 24px,
+        rgba(30, 34, 41, 0.015) 25px
       );
   }
 
@@ -93,10 +93,10 @@
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: var(--bg-surface); }
   ::-webkit-scrollbar-thumb {
-    background: rgba(23, 21, 18, 0.20);
+    background: rgba(30, 34, 41, 0.18);
     border-radius: 2px;
   }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(23, 21, 18, 0.35); }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(30, 34, 41, 0.32); }
 
   *:focus-visible {
     outline: 2px solid var(--border-focus);
