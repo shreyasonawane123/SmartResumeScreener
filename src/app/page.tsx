@@ -86,18 +86,12 @@ export default function Home() {
         className="py-3 px-6 md:px-10 flex justify-between items-center"
         style={{ background: "#2B2620", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
       >
-        <div className="flex items-center gap-0">
+        <div className="flex items-center">
           <span
             className="text-sm font-bold tracking-widest uppercase"
             style={{ color: "#F5F4F0", fontFamily: "'Inter', sans-serif", letterSpacing: "0.2em" }}
           >
             SmartResume Screener
-          </span>
-          <span
-            className="ml-3 text-[10px] tracking-widest uppercase"
-            style={{ color: "#B8AFA0", fontFamily: "'IBM Plex Mono', monospace" }}
-          >
-            Candidate Dossier System
           </span>
         </div>
 
