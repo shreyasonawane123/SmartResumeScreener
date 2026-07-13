@@ -148,25 +148,19 @@ export function JobDescriptionPanel({
 
   return (
     <div className="card p-0 flex flex-col overflow-hidden">
-      {/* ── Case-file cover sheet header ── */}
+      {/* ── Panel header ── */}
       <div
         className="px-6 py-4"
         style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-surface)" }}
       >
-        <p
-          className="text-[9px] tracking-widest uppercase mb-0.5"
-          style={{ color: "var(--text-muted)", fontFamily: "'Inter', sans-serif" }}
-        >
-          Case File — Job Specification
-        </p>
         <h2
-          className="text-sm font-bold tracking-tight"
-          style={{ color: "var(--text-primary)", fontFamily: "'Inter', sans-serif" }}
+          className="text-[11px] font-bold tracking-widest uppercase"
+          style={{ color: "var(--text-secondary)", fontFamily: "'Inter', sans-serif" }}
         >
           Job Details
         </h2>
         <p
-          className="text-[10px] mt-0.5"
+          className="text-[11px] mt-1"
           style={{ color: "var(--text-muted)", fontFamily: "'IBM Plex Mono', monospace" }}
         >
           Enter details or load a saved job description to score against.
@@ -177,7 +171,11 @@ export function JobDescriptionPanel({
         {/* ── Load Saved Job ── */}
         {savedJobs.length > 0 && (
           <div>
-            <label className="field-label" htmlFor="saved-job-select">
+            <label
+              className="text-[11px] font-bold tracking-widest uppercase block mb-1.5"
+              style={{ color: "var(--text-secondary)", fontFamily: "'Inter', sans-serif" }}
+              htmlFor="saved-job-select"
+            >
               Load Saved Job
             </label>
             <select
@@ -201,7 +199,11 @@ export function JobDescriptionPanel({
         <form id="job-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
           {/* ── SUBJECT field ── */}
           <div>
-            <label className="field-label" htmlFor="job-title">
+            <label
+              className="text-[11px] font-bold tracking-widest uppercase block mb-1.5"
+              style={{ color: "var(--text-secondary)", fontFamily: "'Inter', sans-serif" }}
+              htmlFor="job-title"
+            >
               Subject / Role Title
             </label>
             <input
@@ -218,7 +220,11 @@ export function JobDescriptionPanel({
 
           {/* ── REQUIREMENTS field ── */}
           <div>
-            <label className="field-label" htmlFor="job-description">
+            <label
+              className="text-[11px] font-bold tracking-widest uppercase block mb-1.5"
+              style={{ color: "var(--text-secondary)", fontFamily: "'Inter', sans-serif" }}
+              htmlFor="job-description"
+            >
               Requirements
             </label>
             <textarea
@@ -235,11 +241,15 @@ export function JobDescriptionPanel({
           {/* ── Shortlisting Threshold ── */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <label className="field-label !mb-0" htmlFor="threshold-slider">
+              <label
+                className="text-[11px] font-bold tracking-widest uppercase"
+                style={{ color: "var(--text-secondary)", fontFamily: "'Inter', sans-serif" }}
+                htmlFor="threshold-slider"
+              >
                 Shortlist Threshold
               </label>
               <span
-                className="text-[10px] font-bold"
+                className="text-[11px] font-bold"
                 style={{ color: "var(--text-primary)", fontFamily: "'IBM Plex Mono', monospace" }}
               >
                 Score ≥ {threshold.toFixed(0)} / 10
@@ -277,7 +287,7 @@ export function JobDescriptionPanel({
               />
             </div>
             <p
-              className="text-[9px] mt-1.5 leading-relaxed"
+              className="text-[11px] mt-1.5 leading-relaxed"
               style={{ color: "var(--text-muted)", fontFamily: "'IBM Plex Mono', monospace" }}
             >
               Adjusting threshold updates the shortlisted column instantly.

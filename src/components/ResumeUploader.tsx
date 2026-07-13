@@ -174,19 +174,19 @@ export function ResumeUploader({
         </svg>
 
         <h3
-          className="text-xs font-bold tracking-widest uppercase mb-1"
+          className="text-[11px] font-bold tracking-widest uppercase mb-1"
           style={{ color: "var(--text-secondary)", fontFamily: "'Inter', sans-serif" }}
         >
           Upload Candidate Resumes
         </h3>
         <p
-          className="text-[10px]"
+          className="text-[11px]"
           style={{ color: "var(--text-muted)", fontFamily: "'IBM Plex Mono', monospace" }}
         >
           Drag &amp; drop PDF or TXT, or click to browse.
         </p>
         <span
-          className="text-[9px] mt-2"
+          className="text-[11px] mt-2"
           style={{ color: "var(--text-muted)", fontFamily: "'IBM Plex Mono', monospace" }}
         >
           Max 10 MB per file · {existingResumeCount} file{existingResumeCount !== 1 ? "s" : ""} for this job
