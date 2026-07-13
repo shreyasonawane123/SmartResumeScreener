@@ -6,18 +6,22 @@ import { scoreCandidate, ScoringError } from "@/lib/llm/score";
 import type { ResumeData } from "@/lib/types";
 
 jest.mock("@/lib/llm/client", () => ({
-  getGeminiClient: jest.fn(),
-  MODEL_ID: "gemini-2.0-flash",
+  getGroqClient: jest.fn(),
+  MODEL_ID: "llama-3.3-70b-versatile",
 }));
 
-import { getGeminiClient } from "@/lib/llm/client";
+import { getGroqClient } from "@/lib/llm/client";
 
-const mockSendMessage = jest.fn();
-const mockStartChat = jest.fn().mockReturnValue({ sendMessage: mockSendMessage });
-const mockGetGenerativeModel = jest.fn().mockReturnValue({ startChat: mockStartChat });
-const mockClient = { getGenerativeModel: mockGetGenerativeModel };
+const mockCreate = jest.fn();
+const mockClient = {
+  chat: {
+    completions: {
+      create: mockCreate,
+    },
+  },
+};
 
-(getGeminiClient as jest.Mock).mockReturnValue(mockClient);
+(getGroqClient as jest.Mock).mockReturnValue(mockClient);
 
 const sampleResume: ResumeData = {
   name: "Alice Chen",
@@ -29,11 +33,15 @@ const sampleResume: ResumeData = {
 const sampleJD =
   "We need a senior full-stack engineer with 5+ years TypeScript, React, Node.js, and AWS experience.";
 
-function makeGeminiResponse(input: object) {
+function makeGroqResponse(input: object) {
   return {
-    response: {
-      text: () => JSON.stringify(input),
-    },
+    choices: [
+      {
+        message: {
+          content: JSON.stringify(input),
+        },
+      },
+    ],
   };
 }
 
@@ -48,56 +56,55 @@ const validScoreInput = {
 describe("scoreCandidate", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getGeminiClient as jest.Mock).mockReturnValue(mockClient);
-    mockGetGenerativeModel.mockReturnValue({ startChat: mockStartChat });
-    mockStartChat.mockReturnValue({ sendMessage: mockSendMessage });
+    (getGroqClient as jest.Mock).mockReturnValue(mockClient);
   });
 
   it("returns a ScoreResult with correct values on valid response", async () => {
-    mockSendMessage.mockResolvedValueOnce(makeGeminiResponse(validScoreInput));
+    mockCreate.mockResolvedValueOnce(makeGroqResponse(validScoreInput));
 
     const result = await scoreCandidate(sampleResume, sampleJD);
 
     expect(result.score).toBe(7);
     expect(result.matched_skills).toContain("TypeScript");
     expect(result.missing_skills).toContain("AWS");
-    expect(mockSendMessage).toHaveBeenCalledTimes(1);
+    expect(mockCreate).toHaveBeenCalledTimes(1);
   });
 
   it("retries on Zod validation failure (score out of range)", async () => {
     const badScore = { ...validScoreInput, score: 11 }; // max is 10
-    mockSendMessage
-      .mockResolvedValueOnce(makeGeminiResponse(badScore))
-      .mockResolvedValueOnce(makeGeminiResponse(validScoreInput));
+    mockCreate
+      .mockResolvedValueOnce(makeGroqResponse(badScore))
+      .mockResolvedValueOnce(makeGroqResponse(validScoreInput));
 
     const result = await scoreCandidate(sampleResume, sampleJD);
     expect(result.score).toBe(7);
-    expect(mockSendMessage).toHaveBeenCalledTimes(2);
+    expect(mockCreate).toHaveBeenCalledTimes(2);
   });
 
   it("throws ScoringError after persistent invalid scores", async () => {
     const badScore = { score: 0, justification: "too short", matched_skills: [], missing_skills: [] };
-    mockSendMessage.mockResolvedValue(makeGeminiResponse(badScore));
+    mockCreate.mockResolvedValue(makeGroqResponse(badScore));
 
     const promise = scoreCandidate(sampleResume, sampleJD);
     await expect(promise).rejects.toThrow(ScoringError);
   });
 
   it("throws ScoringError if the API call throws", async () => {
-    mockSendMessage.mockRejectedValueOnce(new Error("Connection timeout"));
+    mockCreate.mockRejectedValueOnce(new Error("Connection timeout"));
 
     const promise = scoreCandidate(sampleResume, sampleJD);
     await expect(promise).rejects.toThrow(ScoringError);
-    await expect(promise).rejects.toThrow("Gemini API scoring call failed");
+    await expect(promise).rejects.toThrow("Groq API scoring call failed");
   });
 
   it("passes resume JSON and job description to the LLM", async () => {
-    mockSendMessage.mockResolvedValueOnce(makeGeminiResponse(validScoreInput));
+    mockCreate.mockResolvedValueOnce(makeGroqResponse(validScoreInput));
 
     await scoreCandidate(sampleResume, sampleJD);
 
-    const callArgs = mockSendMessage.mock.calls[0][0];
-    expect(callArgs).toContain("Alice Chen");
-    expect(callArgs).toContain(sampleJD);
+    const callMessages = mockCreate.mock.calls[0][0].messages;
+    const userMessage = callMessages.find((m: { role: string }) => m.role === "user");
+    expect(userMessage.content).toContain("Alice Chen");
+    expect(userMessage.content).toContain(sampleJD);
   });
 });

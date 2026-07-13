@@ -1,8 +1,5 @@
 // ============================================================
-// components/ProgressStepper.tsx
-//
-// Shows the active processing state: "Parsing -> Extracting -> Scoring -> Done"
-// with visual steps and active glows.
+// components/ProgressStepper.tsx — dossier palette
 // ============================================================
 
 import { ProcessingStep } from "@/lib/types";
@@ -33,23 +30,40 @@ export function ProgressStepper({ step, filename }: ProgressStepperProps) {
   const currentIndex = getStepIndex(step);
 
   return (
-    <div className="card p-5 mb-6 animate-fade-in">
+    <div
+      className="card p-5 mb-6 animate-fade-in"
+      style={{ borderLeft: "3px solid var(--text-primary)", borderRadius: "0 4px 4px 0" }}
+    >
       {filename && (
         <div className="flex justify-between items-center mb-3">
-          <span className="text-xs font-semibold text-[var(--text-secondary)] truncate max-w-[70%]">
-            Analyzing: <span className="text-[var(--text-primary)]">{filename}</span>
+          <span
+            className="text-[10px] truncate max-w-[70%]"
+            style={{ color: "var(--text-muted)", fontFamily: "'IBM Plex Mono', monospace" }}
+          >
+            analysing: <span style={{ color: "var(--text-primary)" }}>{filename}</span>
           </span>
-          <span className="text-xs text-[var(--accent-bright)] font-medium animate-pulse-soft">
-            {step === "done" ? "Completed" : "Processing..."}
+          <span
+            className="text-[10px] font-bold tracking-widest uppercase animate-pulse-soft"
+            style={{ color: "var(--text-secondary)", fontFamily: "'Inter', sans-serif" }}
+          >
+            {step === "done" ? "Complete" : "Processing…"}
           </span>
         </div>
       )}
+
       <div className="relative flex items-center justify-between">
-        {/* Progress Bar Line */}
-        <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-[var(--border)] -translate-y-1/2 z-0" />
+        {/* Track line */}
         <div
-          className="absolute left-0 top-1/2 h-[2px] bg-[var(--accent)] -translate-y-1/2 z-0 transition-all duration-500 ease-out"
-          style={{ width: `${(Math.max(0, currentIndex) / (stepsList.length - 1)) * 100}%` }}
+          className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 z-0"
+          style={{ background: "var(--border)" }}
+        />
+        {/* Progress fill */}
+        <div
+          className="absolute left-0 top-1/2 h-px -translate-y-1/2 z-0 transition-all duration-500 ease-out"
+          style={{
+            width: `${(Math.max(0, currentIndex) / (stepsList.length - 1)) * 100}%`,
+            background: "var(--text-primary)",
+          }}
         />
 
         {stepsList.map((s, idx) => {
@@ -59,24 +73,31 @@ export function ProgressStepper({ step, filename }: ProgressStepperProps) {
           return (
             <div key={s.value} className="relative z-10 flex flex-col items-center">
               <div
-                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border transition-all duration-300 ${
-                  isCompleted
-                    ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                className="w-5 h-5 flex items-center justify-center text-[9px] font-bold border transition-all duration-300"
+                style={{
+                  borderRadius: "2px",
+                  background: isCompleted
+                    ? "var(--text-primary)"
                     : isActive
-                    ? "bg-[var(--bg-surface)] text-[var(--accent-bright)] border-[var(--accent-bright)] shadow-[0_0_8px_var(--accent-glow)]"
-                    : "bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border)]"
-                }`}
+                    ? "var(--bg-base)"
+                    : "var(--bg-surface)",
+                  border: `1px solid ${isCompleted || isActive ? "var(--text-primary)" : "var(--border)"}`,
+                  color: isCompleted
+                    ? "var(--bg-base)"
+                    : isActive
+                    ? "var(--text-primary)"
+                    : "var(--text-muted)",
+                  fontFamily: "'IBM Plex Mono', monospace",
+                }}
               >
                 {isCompleted ? "✓" : idx + 1}
               </div>
               <span
-                className={`absolute top-8 whitespace-nowrap text-[10px] font-semibold tracking-wider uppercase transition-colors duration-300 ${
-                  isActive
-                    ? "text-[var(--accent-bright)]"
-                    : isCompleted
-                    ? "text-[var(--text-primary)]"
-                    : "text-[var(--text-muted)]"
-                }`}
+                className="absolute top-7 whitespace-nowrap text-[9px] font-bold tracking-widest uppercase transition-colors duration-300"
+                style={{
+                  color: isActive ? "var(--text-primary)" : isCompleted ? "var(--text-secondary)" : "var(--text-muted)",
+                  fontFamily: "'Inter', sans-serif",
+                }}
               >
                 {s.label}
               </span>
@@ -84,8 +105,7 @@ export function ProgressStepper({ step, filename }: ProgressStepperProps) {
           );
         })}
       </div>
-      {/* Visual spacer to prevent text overlap */}
-      <div className="h-6" />
+      <div className="h-5" />
     </div>
   );
 }

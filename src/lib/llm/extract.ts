@@ -1,21 +1,20 @@
 // ============================================================
 // lib/llm/extract.ts
 //
-// Calls Google's Gemini API to extract structured data from resume text.
-// Uses Gemini's responseMimeType: "application/json" and responseSchema
-// configuration to force the model to return valid structured JSON.
+// Calls Groq's API to extract structured data from resume text.
+// Uses Groq's JSON mode (response_format: { type: "json_object" })
+// so the model is forced to return valid JSON, not prose.
 //
 // Retry logic: if Zod validation fails on the first attempt,
 // we send the validation error back to the model and ask it to
 // correct its output. Max 2 attempts total.
 // ============================================================
 
-import { getGeminiClient, MODEL_ID } from "./client";
+import { getGroqClient, MODEL_ID } from "./client";
 import { EXTRACTION_SYSTEM_PROMPT, EXTRACTION_USER_PROMPT } from "./prompts";
 import { ResumeDataSchema } from "@/lib/schemas";
 import type { ResumeData } from "@/lib/types";
 import { LLM_MAX_RETRIES } from "@/lib/constants";
-import { Schema } from "@google/generative-ai";
 
 export class ExtractionError extends Error {
   constructor(
@@ -27,87 +26,56 @@ export class ExtractionError extends Error {
   }
 }
 
-// Gemini Schema defining the expected output structure.
-// Using string literals instead of the Type enum avoids Jest ESM/CJS import issues.
-const EXTRACTION_SCHEMA: Schema = {
-  type: "object" as any,
-  properties: {
-    name: { type: "string" as any, description: "Candidate full name" },
-    skills: {
-      type: "array" as any,
-      items: { type: "string" as any },
-      description: "Technical and soft skills",
-    },
-    experience: {
-      type: "array" as any,
-      items: {
-        type: "object" as any,
-        properties: {
-          role: { type: "string" as any },
-          company: { type: "string" as any },
-          years: { type: "number" as any },
-        },
-        required: ["role", "company", "years"],
-      },
-    },
-    education: {
-      type: "array" as any,
-      items: {
-        type: "object" as any,
-        properties: {
-          degree: { type: "string" as any },
-          institution: { type: "string" as any },
-        },
-        required: ["degree", "institution"],
-      },
-    },
-  },
-  required: ["name", "skills", "experience", "education"],
-};
-
 /**
- * Extract structured resume data from raw text using Gemini.
+ * Extract structured resume data from raw text using Groq (Llama 3.3 70B).
  * Validates the output with Zod and retries once if validation fails.
  *
  * @throws {ExtractionError} if both attempts fail
  */
 export async function extractResumeData(resumeText: string): Promise<ResumeData> {
-  const client = getGeminiClient();
+  const client = getGroqClient();
 
-  // Initialize conversations with system instructions
-  const model = client.getGenerativeModel({
-    model: MODEL_ID,
-    systemInstruction: EXTRACTION_SYSTEM_PROMPT,
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: EXTRACTION_SCHEMA,
-    },
-  });
+  // Build the message history. We'll append messages for retry turns.
+  const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
+    { role: "user", content: EXTRACTION_USER_PROMPT(resumeText) },
+  ];
 
-  const chat = model.startChat({
-    history: [],
-  });
-
-  let nextPrompt = EXTRACTION_USER_PROMPT(resumeText);
   let lastError: string | null = null;
 
   for (let attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
     if (attempt > 0 && lastError) {
-      nextPrompt = `Your previous response failed schema validation with this error: "${lastError}". Please correct the JSON and try again.`;
+      // Append the previous (bad) response is implicitly in history via the loop.
+      // We just add a correction prompt as a new user turn.
+      messages.push({
+        role: "user",
+        content: `Your previous response failed schema validation with this error: "${lastError}". Please correct the JSON and try again.`,
+      });
     }
 
     let rawInput: unknown;
     try {
-      const response = await chat.sendMessage(nextPrompt);
-      const text = response.response.text();
+      const completion = await client.chat.completions.create({
+        model: MODEL_ID,
+        messages,
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+        max_tokens: 1024,
+      });
+
+      const text = completion.choices[0]?.message?.content;
       if (!text) {
-        throw new ExtractionError("Gemini response did not contain text.");
+        throw new ExtractionError("Groq response did not contain text.");
       }
+
+      // Append the assistant reply to history so the next retry has context
+      messages.push({ role: "assistant", content: text });
+
       rawInput = JSON.parse(text);
     } catch (err) {
       if (err instanceof ExtractionError) throw err;
       throw new ExtractionError(
-        `Gemini API call failed: ${err instanceof Error ? err.message : "unknown error"}`,
+        `Groq API call failed: ${err instanceof Error ? err.message : "unknown error"}`,
         err,
       );
     }

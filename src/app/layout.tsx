@@ -15,7 +15,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "SmartResume Screener — AI-Powered Resume Scoring Dashboard",
-  description: "Upload resumes, parse structured data automatically, and rank candidates against job descriptions in real-time with Claude 3.5 Sonnet.",
+  description: "Upload resumes, parse structured data automatically, and rank candidates against job descriptions in real-time with Groq (Llama 3.3 70B).",
 };
 
 export default function RootLayout({

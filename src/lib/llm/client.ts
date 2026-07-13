@@ -1,34 +1,38 @@
 // ============================================================
 // lib/llm/client.ts
 //
-// Gemini SDK singleton.
-// centralizes initialization and validates the GEMINI_API_KEY.
+// Groq SDK singleton.
+// Centralizes initialization and validates the GROQ_API_KEY.
+// Groq provides a 100% free tier (no credit card needed) with
+// access to fast open-source models like Llama 3.3 70B.
+// Sign up and get your key at: https://console.groq.com
 // ============================================================
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 
-let _client: GoogleGenerativeAI | null = null;
+let _client: Groq | null = null;
 
 /**
- * Get the Google Generative AI client singleton.
- * @throws {Error} if GEMINI_API_KEY is not configured
+ * Get the Groq client singleton.
+ * @throws {Error} if GROQ_API_KEY is not configured
  */
-export function getGeminiClient(): GoogleGenerativeAI {
+export function getGroqClient(): Groq {
   if (_client) return _client;
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "GEMINI_API_KEY is not set. Add it to .env.local (see .env.example).",
+      "GROQ_API_KEY is not set. Add it to .env.local — get a free key at https://console.groq.com",
     );
   }
 
-  _client = new GoogleGenerativeAI(apiKey);
+  _client = new Groq({ apiKey });
   return _client;
 }
 
 /**
- * The standard model for fast, structured JSON text generation.
- * gemini-2.0-flash is fully active on the free tier.
+ * The model for fast, structured JSON extraction and scoring.
+ * llama-3.3-70b-versatile is available on the free tier and
+ * is excellent at instruction-following and JSON output.
  */
-export const MODEL_ID = "gemini-2.0-flash";
+export const MODEL_ID = "llama-3.3-70b-versatile";

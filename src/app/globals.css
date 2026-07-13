@@ -1,57 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ============================================================
-   Design tokens — dark-first, with a slate/indigo/violet palette.
-   Named variables so all components reference the same values.
+   Design tokens — Candidate Dossier aesthetic.
+   Warm parchment base, deep navy ink, stamp-red accent only
+   for shortlist, sage/clay for matched/missing skills.
    ============================================================ */
 :root {
-  /* Backgrounds */
-  --bg-base: #0d0f14;
-  --bg-surface: #141720;
-  --bg-card: #1a1e2e;
-  --bg-card-hover: #1e2336;
-  --bg-input: #1a1e2e;
-  --bg-overlay: rgba(13, 15, 20, 0.7);
+  /* Parchment backgrounds */
+  --bg-base:        #EFE8D8;   /* warm parchment */
+  --bg-surface:     #E8E0CC;   /* slightly darker parchment for panels */
+  --bg-card:        #F4EFE4;   /* lighter card surface */
+  --bg-card-hover:  #EDE6D6;   /* subtle hover darkening */
+  --bg-input:       #EBE4D4;   /* input fields */
 
-  /* Borders */
-  --border: rgba(255, 255, 255, 0.07);
-  --border-focus: rgba(139, 92, 246, 0.5);
+  /* Ink / text */
+  --text-primary:   #1C2438;   /* deep navy — main ink */
+  --text-secondary: #4A5568;   /* mid-tone navy */
+  --text-muted:     #8896A8;   /* faint ink for metadata */
 
-  /* Text */
-  --text-primary: #f0f2f8;
-  --text-secondary: #8b93b0;
-  --text-muted: #4d5475;
+  /* Structural lines — hairline, low contrast */
+  --border:         rgba(28, 36, 56, 0.12);
+  --border-strong:  rgba(28, 36, 56, 0.22);
+  --border-focus:   rgba(28, 36, 56, 0.45);
 
-  /* Brand colors */
-  --accent: #7c3aed;         /* violet-600 */
-  --accent-bright: #8b5cf6;  /* violet-500 */
-  --accent-glow: rgba(124, 58, 237, 0.25);
+  /* Stamp red — ONLY for shortlist marking */
+  --stamp-red:      #B23A2E;
+  --stamp-red-dim:  rgba(178, 58, 46, 0.10);
 
-  /* Shortlisted gold */
-  --gold: #f59e0b;
-  --gold-dim: rgba(245, 158, 11, 0.15);
+  /* Matched skills — sage green */
+  --skill-matched-bg:     rgba(92, 122, 92, 0.12);
+  --skill-matched-text:   #3D6B3D;
+  --skill-matched-border: rgba(92, 122, 92, 0.35);
 
-  /* Matched skills */
-  --skill-matched-bg: rgba(34, 197, 94, 0.12);
-  --skill-matched-text: #4ade80;
-  --skill-matched-border: rgba(34, 197, 94, 0.25);
+  /* Missing skills — muted clay */
+  --skill-missing-bg:     rgba(166, 107, 79, 0.10);
+  --skill-missing-text:   #8B4A2E;
+  --skill-missing-border: rgba(166, 107, 79, 0.30);
 
-  /* Missing skills */
-  --skill-missing-bg: rgba(239, 68, 68, 0.1);
-  --skill-missing-text: #f87171;
-  --skill-missing-border: rgba(239, 68, 68, 0.2);
+  /* Score gauge palette — navy track + semantic arc */
+  --gauge-track:    rgba(28, 36, 56, 0.10);
+  --gauge-low:      #B23A2E;   /* clay-red for low scores */
+  --gauge-mid:      #A66B4F;   /* muted clay for mid */
+  --gauge-high:     #5C7A5C;   /* sage green for high */
 
-  /* Score gauge colors: gradient from red → amber → green */
-  --gauge-low: #ef4444;
-  --gauge-mid: #f59e0b;
-  --gauge-high: #22c55e;
-
-  /* Status states */
-  --error: #f87171;
-  --success: #4ade80;
-  --warning: #fbbf24;
+  /* Status */
+  --error:          #B23A2E;
+  --success:        #5C7A5C;
+  --warning:        #A66B4F;
 }
 
 /* ============================================================
@@ -71,31 +70,38 @@
   body {
     background-color: var(--bg-base);
     color: var(--text-primary);
-    font-family: "Inter", system-ui, sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     line-height: 1.6;
     min-height: 100vh;
+    /* Subtle paper texture via repeating gradient */
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 24px,
+        rgba(28, 36, 56, 0.018) 24px,
+        rgba(28, 36, 56, 0.018) 25px
+      );
   }
 
-  /* Scrollbar styling */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  /* Monospace — used for report text, metadata, scores */
+  .font-mono {
+    font-family: 'IBM Plex Mono', 'Courier Prime', 'Courier New', monospace !important;
   }
-  ::-webkit-scrollbar-track {
-    background: var(--bg-surface);
-  }
+
+  /* Scrollbar — warm, ink-toned */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg-surface); }
   ::-webkit-scrollbar-thumb {
-    background: var(--text-muted);
-    border-radius: 3px;
+    background: rgba(28, 36, 56, 0.25);
+    border-radius: 2px;
   }
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
-  }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(28, 36, 56, 0.4); }
 
-  /* Focus ring */
   *:focus-visible {
-    outline: 2px solid var(--accent-bright);
+    outline: 2px solid var(--border-focus);
     outline-offset: 2px;
+    border-radius: 2px;
   }
 }
 
@@ -103,128 +109,237 @@
    Reusable component classes
    ============================================================ */
 @layer components {
-  /* Glassmorphism card */
+  /* Dossier card — paper feel, hairline border, no glow */
   .card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 4px;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 1px 3px rgba(28, 36, 56, 0.06), 0 1px 0 rgba(28, 36, 56, 0.04);
   }
 
   .card:hover {
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border-color: var(--border-strong);
+    box-shadow: 0 3px 10px rgba(28, 36, 56, 0.10);
+  }
+
+  /* Folder-tab card — top tab strip */
+  .card-folder {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0 4px 4px 4px;
+    position: relative;
+    box-shadow: 0 1px 3px rgba(28, 36, 56, 0.07);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .card-folder::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    width: 72px;
+    height: 4px;
+    background: var(--text-primary);
+    border-radius: 2px 2px 0 0;
+    opacity: 0.15;
+  }
+
+  .card-folder:hover {
+    border-color: var(--border-strong);
+    box-shadow: 0 3px 12px rgba(28, 36, 56, 0.12);
   }
 
   /* Input fields */
   .input-base {
     background: var(--bg-input);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 3px;
     color: var(--text-primary);
     padding: 10px 14px;
-    font-size: 0.9rem;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-size: 0.875rem;
+    font-family: 'IBM Plex Mono', monospace;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
     width: 100%;
     resize: none;
   }
 
   .input-base::placeholder {
     color: var(--text-muted);
+    font-style: italic;
   }
 
   .input-base:focus {
     outline: none;
-    border-color: var(--accent-bright);
-    box-shadow: 0 0 0 3px var(--accent-glow);
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px rgba(28, 36, 56, 0.07);
+    background: #F0EAD8;
   }
 
-  /* Primary action button */
+  /* Primary action button — navy ink, no gradient */
   .btn-primary {
-    background: linear-gradient(135deg, var(--accent) 0%, #6d28d9 100%);
-    color: white;
+    background: var(--text-primary);
+    color: var(--bg-base);
     border: none;
-    border-radius: 8px;
-    padding: 10px 20px;
-    font-size: 0.9rem;
-    font-weight: 600;
+    border-radius: 3px;
+    padding: 11px 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
     cursor: pointer;
-    transition: opacity 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;
-    letter-spacing: 0.01em;
+    transition: opacity 0.15s ease, transform 0.1s ease;
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
+    font-family: 'Inter', sans-serif;
   }
 
   .btn-primary:hover:not(:disabled) {
-    opacity: 0.9;
-    box-shadow: 0 4px 20px var(--accent-glow);
+    opacity: 0.88;
     transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(28, 36, 56, 0.20);
   }
 
-  .btn-primary:active:not(:disabled) {
-    transform: translateY(0);
-  }
+  .btn-primary:active:not(:disabled) { transform: translateY(0); }
 
   .btn-primary:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
   }
 
-  /* Secondary button */
+  /* Secondary button — ghost, navy border */
   .btn-secondary {
     background: transparent;
     color: var(--text-secondary);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
     padding: 8px 16px;
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
     cursor: pointer;
     transition: all 0.15s ease;
+    font-family: 'Inter', sans-serif;
   }
 
   .btn-secondary:hover:not(:disabled) {
-    border-color: var(--accent-bright);
+    border-color: var(--text-primary);
     color: var(--text-primary);
+    background: rgba(28, 36, 56, 0.04);
   }
 
-  /* Section label */
+  /* Section label — condensed uppercase, ink */
   .label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--text-muted);
     display: block;
     margin-bottom: 6px;
+    font-family: 'Inter', sans-serif;
   }
 
-  /* Shortlist section header — gold accent */
+  /* Form field label (case-file style) */
+  .field-label {
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    display: block;
+    margin-bottom: 5px;
+    font-family: 'Inter', sans-serif;
+    border-left: 2px solid var(--border-strong);
+    padding-left: 6px;
+  }
+
+  /* Shortlisted section header — stamp red, disciplined */
   .section-header-shortlisted {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--gold);
-    padding: 8px 0;
+    color: var(--stamp-red);
+    padding: 6px 0;
+    font-family: 'Inter', sans-serif;
   }
 
   .section-header-other {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--text-muted);
-    padding: 8px 0;
+    padding: 6px 0;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Rubber stamp element — only on shortlisted cards */
+  .stamp-shortlisted {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    transform: rotate(-14deg);
+    pointer-events: none;
+    z-index: 10;
+    user-select: none;
+  }
+
+  .stamp-shortlisted-inner {
+    border: 2.5px solid var(--stamp-red);
+    border-radius: 3px;
+    padding: 3px 8px;
+    color: var(--stamp-red);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    opacity: 0.70;
+    /* Rough stamp edges */
+    box-shadow:
+      inset 0 0 0 1px rgba(178, 58, 46, 0.15),
+      0 0 0 1px rgba(178, 58, 46, 0.08);
+    filter: url(#stamp-rough);
+  }
+
+  /* Skill index tag — rectangular, not pill */
+  .skill-tag-matched {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 2px;
+    font-size: 0.65rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    border: 1px solid var(--skill-matched-border);
+    background: var(--skill-matched-bg);
+    color: var(--skill-matched-text);
+    letter-spacing: 0.02em;
+  }
+
+  .skill-tag-missing {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 2px;
+    font-size: 0.65rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+    border: 1px solid var(--skill-missing-border);
+    background: var(--skill-missing-bg);
+    color: var(--skill-missing-text);
+    letter-spacing: 0.02em;
   }
 }
 
@@ -237,11 +352,7 @@
   }
 
   .animate-slide-up {
-    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-
-  .animate-gauge {
-    animation: gaugeFill 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   @keyframes fadeIn {
@@ -250,27 +361,26 @@
   }
 
   @keyframes slideUp {
-    from { opacity: 0; transform: translateY(12px); }
+    from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
   }
 
   @keyframes pulse-soft {
     0%, 100% { opacity: 1; }
-    50%       { opacity: 0.5; }
+    50%       { opacity: 0.45; }
   }
 
   .animate-pulse-soft {
-    animation: pulse-soft 1.5s ease infinite;
+    animation: pulse-soft 1.6s ease infinite;
   }
 
   /* Drag-and-drop active state */
   .drag-active {
-    border-color: var(--accent-bright) !important;
-    background: rgba(124, 58, 237, 0.06) !important;
-    box-shadow: 0 0 0 3px var(--accent-glow);
+    border-color: var(--border-strong) !important;
+    background: rgba(28, 36, 56, 0.04) !important;
+    box-shadow: 0 0 0 3px rgba(28, 36, 56, 0.06);
   }
 
-  .text-balance {
-    text-wrap: balance;
-  }
+  .text-balance { text-wrap: balance; }
+  .font-typewriter { font-family: 'IBM Plex Mono', 'Courier Prime', monospace; }
 }
