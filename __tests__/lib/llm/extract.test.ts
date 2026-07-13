@@ -80,17 +80,17 @@ describe("extractResumeData", () => {
 
     mockCreate.mockResolvedValue(makeToolUseResponse(badInput));
 
-    await expect(extractResumeData("resume text")).rejects.toThrow(ExtractionError);
-    await expect(extractResumeData("resume text")).rejects.toThrow(
-      "Resume extraction failed after",
-    );
+    const promise = extractResumeData("resume text");
+    await expect(promise).rejects.toThrow(ExtractionError);
+    await expect(promise).rejects.toThrow("Resume extraction failed after");
   });
 
   it("throws ExtractionError if the LLM call throws", async () => {
     mockCreate.mockRejectedValueOnce(new Error("API rate limit exceeded"));
 
-    await expect(extractResumeData("resume text")).rejects.toThrow(ExtractionError);
-    await expect(extractResumeData("resume text")).rejects.toThrow("LLM call failed");
+    const promise = extractResumeData("resume text");
+    await expect(promise).rejects.toThrow(ExtractionError);
+    await expect(promise).rejects.toThrow("LLM call failed");
   });
 
   it("throws ExtractionError if response has no tool_use block", async () => {
@@ -99,7 +99,8 @@ describe("extractResumeData", () => {
       stop_reason: "end_turn",
     });
 
-    await expect(extractResumeData("resume text")).rejects.toThrow(ExtractionError);
-    await expect(extractResumeData("resume text")).rejects.toThrow("tool_use block");
+    const promise = extractResumeData("resume text");
+    await expect(promise).rejects.toThrow(ExtractionError);
+    await expect(promise).rejects.toThrow("tool_use block");
   });
 });

@@ -79,10 +79,9 @@ describe("scoreCandidate", () => {
   it("throws ScoringError if the API call throws", async () => {
     mockCreate.mockRejectedValueOnce(new Error("Connection timeout"));
 
-    await expect(scoreCandidate(sampleResume, sampleJD)).rejects.toThrow(ScoringError);
-    await expect(scoreCandidate(sampleResume, sampleJD)).rejects.toThrow(
-      "LLM scoring call failed",
-    );
+    const promise = scoreCandidate(sampleResume, sampleJD);
+    await expect(promise).rejects.toThrow(ScoringError);
+    await expect(promise).rejects.toThrow("LLM scoring call failed");
   });
 
   it("passes resume JSON and job description to the LLM", async () => {
