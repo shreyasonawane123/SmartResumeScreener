@@ -125,13 +125,13 @@ export function ResumeUploader({
         <div>
           <p
             className="text-[11px] font-bold tracking-widest uppercase mb-1"
-            style={{ color: "var(--text-secondary)", fontFamily: "'Inter', sans-serif" }}
+            style={{ color: "#171512", fontFamily: "'Inter', sans-serif" }}
           >
             No Job Description Active
           </p>
           <p
             className="text-[10px] leading-relaxed max-w-[260px]"
-            style={{ color: "var(--text-muted)", fontFamily: "'IBM Plex Mono', monospace" }}
+            style={{ color: "#4A443C", fontFamily: "'IBM Plex Mono', monospace" }}
           >
             Select or create a job description above before uploading resumes.
             Resumes are scoped to the opening they are uploaded for.

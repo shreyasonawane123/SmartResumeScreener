@@ -48,7 +48,7 @@ export function CandidateList({ candidates, threshold, isLoading }: CandidateLis
         {/* File/folder icon */}
         <svg
           className="w-10 h-10 mb-4"
-          style={{ color: "var(--text-muted)", opacity: 0.5 }}
+          style={{ color: "var(--text-muted)", opacity: 0.55 }}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -61,17 +61,17 @@ export function CandidateList({ candidates, threshold, isLoading }: CandidateLis
           />
         </svg>
         <h3
-          className="text-xs font-bold tracking-widest uppercase mb-1"
-          style={{ color: "var(--text-secondary)", fontFamily: "'Inter', sans-serif" }}
+          className="text-xs font-bold tracking-widest uppercase mb-2"
+          style={{ color: "#171512", fontFamily: "'Inter', sans-serif" }}
         >
           No Dossiers Scored
         </h3>
         <p
           className="text-[10px] max-w-[260px] leading-relaxed"
-          style={{ color: "var(--text-muted)", fontFamily: "'IBM Plex Mono', monospace" }}
+          style={{ color: "#4A443C", fontFamily: "'IBM Plex Mono', monospace" }}
         >
           Upload candidate resumes and fill in the job details on the left, then click
-          "Analyse & Score" to begin ranking.
+          “Analyse & Score” to begin ranking.
         </p>
       </div>
     );
@@ -122,7 +122,7 @@ export function CandidateList({ candidates, threshold, isLoading }: CandidateLis
       {shortlisted.length === 0 && otherCandidates.length === 0 && (
         <div
           className="text-center py-4 text-[10px] font-mono"
-          style={{ color: "var(--text-muted)" }}
+          style={{ color: "#4A443C" }}
         >
           No candidates match the scoring criteria.
         </div>

@@ -83,19 +83,19 @@ export default function Home() {
     <div className="min-h-screen flex flex-col">
       {/* ── Header ── */}
       <header
-        className="border-b py-3 px-6 md:px-10 flex justify-between items-center"
-        style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}
+        className="py-3 px-6 md:px-10 flex justify-between items-center"
+        style={{ background: "#2B2620", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
       >
-        <div>
+        <div className="flex items-center gap-0">
           <span
             className="text-sm font-bold tracking-widest uppercase"
-            style={{ color: "var(--text-primary)", fontFamily: "'Inter', sans-serif", letterSpacing: "0.2em" }}
+            style={{ color: "#F5F4F0", fontFamily: "'Inter', sans-serif", letterSpacing: "0.2em" }}
           >
             SmartResume Screener
           </span>
           <span
             className="ml-3 text-[10px] tracking-widest uppercase"
-            style={{ color: "var(--text-muted)", fontFamily: "'IBM Plex Mono', monospace" }}
+            style={{ color: "#B8AFA0", fontFamily: "'IBM Plex Mono', monospace" }}
           >
             Candidate Dossier System
           </span>
@@ -104,7 +104,7 @@ export default function Home() {
         <div className="flex items-center gap-5">
           <span
             className="text-[10px] hidden sm:inline-flex items-center gap-1.5 font-mono tracking-wide"
-            style={{ color: "var(--text-muted)" }}
+            style={{ color: "#C8C0B4" }}
           >
             <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--success)" }} />
             LIVE — GROQ LLM
@@ -113,7 +113,25 @@ export default function Home() {
             href="https://github.com"
             target="_blank"
             rel="noreferrer"
-            className="btn-secondary text-[10px] px-3 py-1.5"
+            className="text-[10px] px-3 py-1.5 font-semibold tracking-wide uppercase"
+            style={{
+              color: "#C8C0B4",
+              border: "1px solid rgba(200,192,180,0.35)",
+              borderRadius: "3px",
+              background: "transparent",
+              fontFamily: "'Inter', sans-serif",
+              letterSpacing: "0.06em",
+              transition: "border-color 0.15s ease, color 0.15s ease",
+              textDecoration: "none",
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(245,244,240,0.6)";
+              (e.currentTarget as HTMLAnchorElement).style.color = "#F5F4F0";
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(200,192,180,0.35)";
+              (e.currentTarget as HTMLAnchorElement).style.color = "#C8C0B4";
+            }}
           >
             GitHub
           </a>
