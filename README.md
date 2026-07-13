@@ -2,6 +2,12 @@
 
 An evaluation tool that handles structured resume parsing and match scoring against job requirements. The core design is built on a two-pass LLM pipeline (extract first, score second) to minimize token spend on job description edits.
 
+## Live Demo
+
+**Deployed on Vercel:** [https://smart-resume-screener-seven.vercel.app/](https://smart-resume-screener-seven.vercel.app/)
+
+> The live demo uses a shared Supabase instance and Groq API key. If the Groq free-tier rate limit is hit, wait 60 seconds and retry.
+
 ## Architecture Overview
 
 ```
@@ -91,7 +97,9 @@ Fill in the credentials in `.env.local`:
 |---|---|
 | `GROQ_API_KEY` | Go to [console.groq.com](https://console.groq.com), sign up, go to **API Keys**, and create a new key. No credit card required. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Found in your Supabase project under **Settings ? API ? Project URL**. |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Found under **Settings ? API ? anon** public key. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Found under **Settings ? API ? service_role** secret key. Used server-side only to bypass Row Level Security for writes. Never expose this in client-side code. |
+| `NEXT_PUBLIC_APP_URL` | Your deployed URL, e.g. `https://smart-resume-screener-seven.vercel.app` (use `http://localhost:3000` locally). |
 
 ### 4. Install Dependencies
 ```bash
