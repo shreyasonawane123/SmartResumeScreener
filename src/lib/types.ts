@@ -90,17 +90,10 @@ export interface CandidateScore {
 // API response shapes
 // ---------------------------------------------------------------------------
 
-export interface ApiSuccess<T> {
-  data: T;
-  error: null;
+export interface ApiResponse<T> {
+  data: T | null;
+  error: string | null;
 }
-
-export interface ApiError {
-  data: null;
-  error: string;
-}
-
-export type ApiResponse<T> = ApiSuccess<T> | ApiError;
 
 // ---------------------------------------------------------------------------
 // Processing state (for the upload progress UI)

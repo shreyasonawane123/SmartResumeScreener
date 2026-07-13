@@ -26,14 +26,16 @@ export class ExtractionError extends Error {
   }
 }
 
+import Anthropic from "@anthropic-ai/sdk";
+
 // The tool definition tells Claude exactly what JSON shape to emit.
 // tool_use is more reliable than asking for JSON in a system prompt
 // because the model is explicitly constrained to the input_schema.
-const EXTRACTION_TOOL = {
+const EXTRACTION_TOOL: Anthropic.Messages.Tool = {
   name: "extract_resume_data",
   description: "Extract structured information from resume text and return as JSON.",
   input_schema: {
-    type: "object" as const,
+    type: "object",
     properties: {
       name: { type: "string", description: "Candidate full name" },
       skills: {
@@ -67,7 +69,7 @@ const EXTRACTION_TOOL = {
     },
     required: ["name", "skills", "experience", "education"],
   },
-} as const;
+};
 
 /**
  * Extract structured resume data from raw text using the LLM.
@@ -131,8 +133,8 @@ export async function extractResumeData(resumeText: string): Promise<ResumeData>
     }
 
     // Format Zod errors for the retry prompt
-    lastError = parsed.error.errors
-      .map((e) => `${e.path.join(".")}: ${e.message}`)
+    lastError = parsed.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
       .join("; ");
 
     if (attempt === LLM_MAX_RETRIES) {

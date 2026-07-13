@@ -25,12 +25,14 @@ export class ScoringError extends Error {
   }
 }
 
+import Anthropic from "@anthropic-ai/sdk";
+
 // Tool definition for scoring — forces Claude to emit the exact shape we need
-const SCORING_TOOL = {
+const SCORING_TOOL: Anthropic.Messages.Tool = {
   name: "score_candidate",
   description: "Score how well a candidate's resume matches a job description.",
   input_schema: {
-    type: "object" as const,
+    type: "object",
     properties: {
       score: {
         type: "number",
@@ -53,7 +55,7 @@ const SCORING_TOOL = {
     },
     required: ["score", "justification", "matched_skills", "missing_skills"],
   },
-} as const;
+};
 
 /**
  * Score a candidate resume against a job description.
@@ -118,8 +120,8 @@ export async function scoreCandidate(
       return parsed.data as ScoreResult;
     }
 
-    lastError = parsed.error.errors
-      .map((e) => `${e.path.join(".")}: ${e.message}`)
+    lastError = parsed.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
       .join("; ");
 
     if (attempt === LLM_MAX_RETRIES) {

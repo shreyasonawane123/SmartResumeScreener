@@ -26,7 +26,7 @@ export async function POST(
 
   const parsed = JobDescriptionSchema.safeParse(body);
   if (!parsed.success) {
-    const message = parsed.error.errors.map((e) => e.message).join("; ");
+    const message = parsed.error.issues.map((issue) => issue.message).join("; ");
     return NextResponse.json(
       { data: null, error: `Validation failed: ${message}` },
       { status: 400 },
