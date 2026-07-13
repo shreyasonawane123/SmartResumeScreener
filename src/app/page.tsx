@@ -1,14 +1,14 @@
 "use client";
 
 // ============================================================
-// app/page.tsx
+// app/page.tsx — Candidate Dossier layout
 //
-// Root dashboard layout. Features a beautiful split-view:
-// - Left: Job details form + resume uploader
-// - Right: Live score results split into Shortlisted vs Others
+// activeJobId is lifted here so ResumeUploader can be gated
+// (disabled until a job is selected) and candidates can be
+// refreshed when the active job changes.
 // ============================================================
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { JobDescriptionPanel } from "@/components/JobDescriptionPanel";
 import { ResumeUploader } from "@/components/ResumeUploader";
 import { CandidateList } from "@/components/CandidateList";
@@ -18,48 +18,44 @@ import { DEFAULT_SHORTLIST_THRESHOLD } from "@/lib/constants";
 import type { CandidateScore, StoredResume, ProcessingStep } from "@/lib/types";
 
 export default function Home() {
+  // The currently active job description ID.
+  // Set when user saves a new job OR selects one from the dropdown.
+  // ResumeUploader is disabled until this is non-empty.
+  const [activeJobId, setActiveJobId] = useState<string>("");
+
   const [resumes, setResumes] = useState<StoredResume[]>([]);
   const [candidates, setCandidates] = useState<CandidateScore[]>([]);
   const [threshold, setThreshold] = useState(DEFAULT_SHORTLIST_THRESHOLD);
 
-  // Error and Loading/Pipeline States
   const [error, setError] = useState<string | null>(null);
   const [pipelineStep, setPipelineStep] = useState<ProcessingStep>("idle");
   const [activeFilename, setActiveFilename] = useState<string>("");
   const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
 
-  // Load existing resumes from database on mount
-  useEffect(() => {
-    async function loadResumes() {
-      try {
-        const res = await fetch("/api/resumes");
-        const json = await res.json();
-        if (json.data) {
-          setResumes(json.data);
-        }
-      } catch (err) {
-        console.error("Failed to load existing resumes:", err);
-      }
+  // Called by JobDescriptionPanel whenever a job becomes active
+  // (either newly saved or selected from dropdown).
+  // Clears the candidate list so stale results from a previous job don't linger.
+  const handleJobReady = (jobId: string) => {
+    if (jobId !== activeJobId) {
+      setActiveJobId(jobId);
+      setResumes([]);      // clear resumes — they belong to a different job
+      setCandidates([]);   // clear results — they were for a different job
+      setError(null);
     }
-    loadResumes();
-  }, []);
+  };
 
-  // Handle new resume upload successes
   const handleUploadSuccess = (newResumes: StoredResume[]) => {
     setResumes((prev) => {
-      // Deduplicate by filename
       const filtered = prev.filter((r) => !newResumes.some((nr) => nr.filename === r.filename));
       return [...newResumes, ...filtered];
     });
   };
 
-  // Run the full LLM scoring workflow
   const handleAnalyze = async (jobId: string) => {
     if (resumes.length === 0) {
-      setError("Please upload at least one resume on the left first.");
+      setError("Please upload at least one resume for this job description first.");
       return;
     }
-
     setIsLoadingCandidates(true);
     setPipelineStep("scoring");
     setError(null);
@@ -70,16 +66,10 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ job_description_id: jobId }),
       });
-
       const json = await res.json();
-      if (!res.ok || json.error) {
-        throw new Error(json.error || "Analysis pipeline failed during scoring.");
-      }
-
+      if (!res.ok || json.error) throw new Error(json.error || "Analysis pipeline failed.");
       setCandidates(json.data || []);
       setPipelineStep("done");
-
-      // Reset step to idle after a few seconds of visual completion
       setTimeout(() => setPipelineStep("idle"), 3000);
     } catch (err) {
       setPipelineStep("error");
@@ -91,74 +81,87 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Premium Header bar */}
-      <header className="border-b border-[var(--border)] bg-[var(--bg-surface)] py-4 px-6 md:px-8 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[var(--accent)] to-[#6d28d9] flex items-center justify-center font-bold text-white shadow-[0_0_12px_var(--accent-glow)]">
-            S
-          </div>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
-              SmartResume Screener
-            </h1>
-            <p className="text-[10px] text-[var(--text-secondary)] font-medium">
-              Vercel Serverless Core • Claude 3.5 Sonnet
-            </p>
-          </div>
+      {/* ── Header ── */}
+      <header
+        className="border-b py-3 px-6 md:px-10 flex justify-between items-center"
+        style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}
+      >
+        <div>
+          <span
+            className="text-sm font-bold tracking-widest uppercase"
+            style={{ color: "var(--text-primary)", fontFamily: "'Inter', sans-serif", letterSpacing: "0.2em" }}
+          >
+            SmartResume Screener
+          </span>
+          <span
+            className="ml-3 text-[10px] tracking-widest uppercase"
+            style={{ color: "var(--text-muted)", fontFamily: "'IBM Plex Mono', monospace" }}
+          >
+            Candidate Dossier System
+          </span>
         </div>
 
-        <div className="flex items-center gap-4">
-          <span className="text-xs text-[var(--text-secondary)] hidden sm:inline-flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
-            Supabase connected
+        <div className="flex items-center gap-5">
+          <span
+            className="text-[10px] hidden sm:inline-flex items-center gap-1.5 font-mono tracking-wide"
+            style={{ color: "var(--text-muted)" }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "var(--success)" }} />
+            LIVE — GROQ LLM
           </span>
           <a
             href="https://github.com"
             target="_blank"
             rel="noreferrer"
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors text-xs font-semibold border border-[var(--border)] rounded-md px-2.5 py-1"
+            className="btn-secondary text-[10px] px-3 py-1.5"
           >
             GitHub
           </a>
         </div>
       </header>
 
-      {/* Main split-view dashboard */}
+      {/* ── Main split-view ── */}
       <main className="flex-1 max-w-[1440px] w-full mx-auto p-6 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left column (Job Inputs & Uploads) — Col 5 */}
+        {/* Left column */}
         <section className="lg:col-span-5 flex flex-col gap-6">
           <JobDescriptionPanel
             threshold={threshold}
             onThresholdChange={setThreshold}
             onAnalyze={handleAnalyze}
+            onJobReady={handleJobReady}
             isAnalyzing={isLoadingCandidates}
             onSetError={setError}
           />
-
           <ResumeUploader
+            jobDescriptionId={activeJobId}
             onUploadSuccess={handleUploadSuccess}
             onSetError={setError}
             existingResumeCount={resumes.length}
           />
         </section>
 
-        {/* Right column (Results List) — Col 7 */}
+        {/* Right column */}
         <section className="lg:col-span-7 flex flex-col">
-          {/* Global Pipeline Error message */}
           <ErrorBanner message={error} onClear={() => setError(null)} />
-
-          {/* Active processing step feedback */}
           <ProgressStepper step={pipelineStep} filename={activeFilename} />
 
-          {/* Candidate Lists */}
           <div className="space-y-4">
-            <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
-              <h2 className="text-sm font-bold text-[var(--text-primary)] tracking-wide uppercase">
+            <div
+              className="flex justify-between items-center pb-2"
+              style={{ borderBottom: "1px solid var(--border)" }}
+            >
+              <h2
+                className="text-[11px] font-bold tracking-widest uppercase"
+                style={{ color: "var(--text-secondary)", fontFamily: "'Inter', sans-serif" }}
+              >
                 Ranking Results
               </h2>
               {candidates.length > 0 && (
-                <span className="text-xs text-[var(--text-secondary)]">
-                  Sorted by Score (Descending)
+                <span
+                  className="text-[10px] font-mono"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {candidates.length} file{candidates.length !== 1 ? "s" : ""} scored — descending
                 </span>
               )}
             </div>

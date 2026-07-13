@@ -4,8 +4,8 @@
 // POST /api/scores
 // Body: { job_description_id: string }
 //
-// Fetches all resumes, scores each against the specified job
-// description, persists results, returns ranked candidates.
+// Fetches only resumes scoped to the given job description,
+// scores each, persists results, returns ranked candidates.
 //
 // GET /api/scores?job_description_id=<id>
 // Returns previously stored scores for a job description.
@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { scoreCandidate, ScoringError } from "@/lib/llm/score";
-import { getAllResumes } from "@/lib/db/resumes";
+import { getResumesByJobDescription } from "@/lib/db/resumes";
 import {
   insertScore,
   getScoresForJob,
@@ -68,10 +68,10 @@ export async function POST(
     );
   }
 
-  // Fetch all resumes to score
+  // Fetch only resumes that belong to this job description
   let resumes;
   try {
-    resumes = await getAllResumes();
+    resumes = await getResumesByJobDescription(job_description_id);
   } catch (err) {
     return NextResponse.json(
       {
@@ -84,7 +84,11 @@ export async function POST(
 
   if (resumes.length === 0) {
     return NextResponse.json(
-      { data: null, error: "No resumes found. Upload at least one resume first." },
+      {
+        data: null,
+        error:
+          "No resumes found for this job description. Upload resumes after selecting the job.",
+      },
       { status: 422 },
     );
   }

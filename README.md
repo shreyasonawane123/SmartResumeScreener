@@ -18,16 +18,16 @@ An evaluation tool that handles structured resume parsing and match scoring agai
                      +-----+---------+----+
                            |         |
       2. Parse & Extract   |         | 3. Store Structured
-      (Gemini JSON Schema) v         |    Data & Scores
+      (Groq JSON mode)     v         |    Data & Scores
                      +-----+---------+----+
-                     |  Google Gemini API | <--->  Supabase DB
-                     | (gemini-2.0-flash) |        (PostgreSQL)
+                     |     Groq API       | <--->  Supabase DB
+                     | (llama-3.3-70b)    |        (PostgreSQL)
                      +--------------------+
 ```
 
 ### Separation of Concerns
 - **`/src/lib/parsing/`**: Handles text extraction from uploads. Relies on `unpdf` instead of the traditional `pdf-parse` package because `unpdf` compiles with zero native binary bindings, preventing canvas dependency load failures in Vercel's serverless environment.
-- **`/src/lib/llm/`**: Manages the Gemini client configuration, prompt structures, and native JSON response schema mappings.
+- **`/src/lib/llm/`**: Manages the Groq client configuration, prompt structures, and JSON mode response handling.
 - **`/src/lib/db/`**: Handles direct Supabase CRUD database transactions.
 - **`/src/app/api/`**: Simple request/response route endpoints. All logic is decoupled into `/lib` so that parsing, scoring, and database transactions can be unit tested without spawning the Next.js runtime.
 - **`/src/components/`**: Clean Tailwind UI components. Stateful dashboard assembly is delegated to `src/app/page.tsx` to keep individual components highly reusable.
@@ -48,13 +48,13 @@ Both prompts are defined in [`src/lib/llm/prompts.ts`](file:///src/lib/llm/promp
 ### 1. Resume Extraction Prompt
 Converts raw, unstructured resume text into a structured profile schema.
 - **Why it's structured this way**: It provides an explicit TypeScript-mirror output schema, a few-shot worked example to align format expectations (especially converting text durations into numbers), and instructions to reason step-by-step internally.
-- **Structured JSON Schema**: Rather than relying on Gemini to output valid JSON in markdown prose blocks, we configure the request with `responseMimeType: "application/json"` and define a strict `responseSchema` on the SDK client, forcing the model to output a schema-validated object.
-- **Validation & Retry**: The backend validates the model's output using Zod. If the model outputs bad schema structures, the system automatically retries once by sending the Zod validation issues back in the chat thread, allowing the model to self-correct.
+- **Structured JSON Mode**: Rather than relying on the model to output valid JSON in markdown prose blocks, we configure the Groq request with `response_format: { type: "json_object" }`, forcing the model to output valid JSON.
+- **Validation & Retry**: The backend validates the model's output using Zod. If the model outputs bad schema structures, the system automatically retries once by sending the Zod validation issues back in the message thread, allowing the model to self-correct.
 
 ### 2. Candidate Scoring Prompt
 Rates candidate fit on a 1–10 scale against a job description.
 - **Why it's structured this way**: Inputs are passed as pre-structured JSON (reducing noise). It specifies score calibration (1–3 for major gaps, 4–6 for partial fit, 7–8 for good fit, 9–10 for excellent fit) to prevent score drift, and requires both matched and missing skill lists to drive frontend chips.
-- **Structured JSON Schema**: Configured with `responseSchema` on the client.
+- **Structured JSON Mode**: Configured with `response_format: { type: "json_object" }` on the request.
 
 ---
 
@@ -72,7 +72,7 @@ Copy the template to create a local environment file:
 cp .env.example .env.local
 ```
 Fill in the credentials in `.env.local`:
-- `GEMINI_API_KEY`: Get a free key at [Google AI Studio](https://aistudio.google.com/) (no credit card required).
+- `GROQ_API_KEY`: Get a free key (no credit card required) at [console.groq.com](https://console.groq.com).
 - `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
 - `SUPABASE_SERVICE_ROLE_KEY`: Service role API key (used server-side for database write bypass).
 
@@ -102,6 +102,15 @@ Check TypeScript compilation:
 ```bash
 npm run type-check
 ```
+
+---
+
+## Data Model: Job-Scoped Resumes
+
+By design, candidate resumes are scoped directly to a specific job description (`job_description_id` column in the `resumes` table). 
+- This matches a real-world recruiting workflow, where candidates apply to a specific open requisition rather than a global pool scored against arbitrary jobs.
+- Selecting a saved job description instantly filters the candidates to only show those uploaded for that specific role.
+- Uploads are disabled until a job description is active to prevent orphaned candidate records.
 
 ---
 

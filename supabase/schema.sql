@@ -2,8 +2,8 @@
 -- supabase/schema.sql
 --
 -- Run this in the Supabase SQL Editor (Dashboard > SQL Editor)
--- for your project. Run it once. Re-running is safe because of
--- the IF NOT EXISTS guards.
+-- for your project. Re-running is safe: all DDL uses
+-- IF NOT EXISTS guards and idempotent ALTER TABLE logic.
 --
 -- Setup steps:
 -- 1. Create a free project at https://supabase.com
@@ -16,20 +16,8 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ---------------------------------------------------------------------------
--- resumes
--- Stores both raw text and structured JSON from each uploaded resume.
--- Raw text is kept so extraction can be re-run without re-uploading.
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS resumes (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  filename        TEXT NOT NULL,
-  raw_text        TEXT NOT NULL,
-  structured_json JSONB NOT NULL,           -- parsed ResumeData from LLM
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ---------------------------------------------------------------------------
 -- job_descriptions
+-- Must be created BEFORE resumes, because resumes now FK into this table.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS job_descriptions (
   id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -39,8 +27,36 @@ CREATE TABLE IF NOT EXISTS job_descriptions (
 );
 
 -- ---------------------------------------------------------------------------
+-- resumes
+-- Stores raw text and LLM-extracted structured JSON per upload.
+-- job_description_id scopes each resume to the opening it was uploaded for.
+-- Cascade delete: removing a job description removes its resumes too.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS resumes (
+  id                 UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  job_description_id UUID NOT NULL REFERENCES job_descriptions(id) ON DELETE CASCADE,
+  filename           TEXT NOT NULL,
+  raw_text           TEXT NOT NULL,
+  structured_json    JSONB NOT NULL,           -- parsed ResumeData from LLM
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ---------------------------------------------------------------------------
+-- MIGRATION NOTE (for projects that applied the old schema)
+-- If the resumes table already exists WITHOUT job_description_id, run:
+--
+--   ALTER TABLE resumes
+--     ADD COLUMN IF NOT EXISTS job_description_id UUID
+--       REFERENCES job_descriptions(id) ON DELETE CASCADE;
+--
+-- Existing orphaned rows will have job_description_id = NULL. You may either:
+--   a) Delete old rows:   DELETE FROM resumes WHERE job_description_id IS NULL;
+--   b) Re-upload them under the correct job description.
+-- ---------------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------------
 -- scores
--- Stores the LLM's match score for each (resume, job_description) pair.
+-- LLM match score for each (resume, job_description) pair.
 -- Cascade delete: removing a resume or JD cleans up its scores.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS scores (
@@ -54,6 +70,7 @@ CREATE TABLE IF NOT EXISTS scores (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Indexes for the join query in lib/db/scores.ts
-CREATE INDEX IF NOT EXISTS scores_job_description_id_idx ON scores (job_description_id);
-CREATE INDEX IF NOT EXISTS scores_resume_id_idx ON scores (resume_id);
+-- Indexes
+CREATE INDEX IF NOT EXISTS resumes_job_description_id_idx ON resumes (job_description_id);
+CREATE INDEX IF NOT EXISTS scores_job_description_id_idx  ON scores (job_description_id);
+CREATE INDEX IF NOT EXISTS scores_resume_id_idx           ON scores (resume_id);

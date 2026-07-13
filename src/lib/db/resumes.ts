@@ -2,9 +2,10 @@
 // lib/db/resumes.ts
 //
 // CRUD operations for the `resumes` table.
-// All functions throw descriptive errors on DB failure —
-// callers (API routes) are responsible for catching and
-// returning appropriate HTTP responses.
+// Resumes are scoped to the job description they were uploaded
+// for — use getResumesByJobDescription(id) for all scoring
+// queries; getAllResumes() is intentionally removed to prevent
+// cross-job contamination.
 // ============================================================
 
 import { getSupabaseClient } from "./client";
@@ -21,10 +22,11 @@ export class DbError extends Error {
 }
 
 /**
- * Insert a new resume record into the database.
- * Stores both raw text (for auditing) and structured JSON (for scoring).
+ * Insert a new resume record, scoped to a specific job description.
+ * Every upload must be tied to an opening — orphaned resumes are not allowed.
  */
 export async function insertResume(params: {
+  job_description_id: string;
   filename: string;
   raw_text: string;
   structured_json: ResumeData;
@@ -34,6 +36,7 @@ export async function insertResume(params: {
   const { data, error } = await db
     .from("resumes")
     .insert({
+      job_description_id: params.job_description_id,
       filename: params.filename,
       raw_text: params.raw_text,
       structured_json: params.structured_json,
@@ -48,17 +51,27 @@ export async function insertResume(params: {
   return data as StoredResume;
 }
 
-/** Fetch all stored resumes, newest first. */
-export async function getAllResumes(): Promise<StoredResume[]> {
+/**
+ * Fetch all resumes that belong to a specific job description.
+ * This is the primary query used by the scoring pipeline —
+ * only resumes uploaded for the active job are scored.
+ */
+export async function getResumesByJobDescription(
+  jobDescriptionId: string,
+): Promise<StoredResume[]> {
   const db = getSupabaseClient();
 
   const { data, error } = await db
     .from("resumes")
     .select("*")
+    .eq("job_description_id", jobDescriptionId)
     .order("created_at", { ascending: false });
 
   if (error) {
-    throw new DbError(`Failed to fetch resumes: ${error.message}`, error);
+    throw new DbError(
+      `Failed to fetch resumes for job ${jobDescriptionId}: ${error.message}`,
+      error,
+    );
   }
 
   return (data ?? []) as StoredResume[];

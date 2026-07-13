@@ -2,19 +2,23 @@
 // app/api/resumes/route.ts
 //
 // POST /api/resumes
-// Accepts a multipart form with one or more resume files.
-// Parses each file, runs LLM extraction, saves to DB.
-// Returns the stored resume records.
+// Accepts multipart form with:
+//   - files: one or more resume files (PDF or TXT)
+//   - job_description_id: UUID of the job this upload belongs to
 //
-// This handler does request/response only. All business logic
-// (parsing, extraction, DB writes) lives in /lib.
+// Resumes are scoped to a job description. Uploading without
+// a job_description_id is rejected with 400.
+//
+// GET /api/resumes?job_description_id=<id>
+// Returns resumes for a specific job only.
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
 import { extractPdfText, PdfParseError } from "@/lib/parsing/pdf";
 import { extractPlainText, TextParseError } from "@/lib/parsing/text";
 import { extractResumeData, ExtractionError } from "@/lib/llm/extract";
-import { insertResume } from "@/lib/db/resumes";
+import { insertResume, getResumesByJobDescription } from "@/lib/db/resumes";
+import { DbError } from "@/lib/db/resumes";
 import { ACCEPTED_FILE_TYPES, MAX_FILE_SIZE_BYTES } from "@/lib/constants";
 import type { StoredResume, ApiResponse } from "@/lib/types";
 
@@ -31,6 +35,19 @@ export async function POST(
     );
   }
 
+  // job_description_id is required — resumes must be scoped to an opening
+  const job_description_id = formData.get("job_description_id") as string | null;
+  if (!job_description_id) {
+    return NextResponse.json(
+      {
+        data: null,
+        error:
+          "job_description_id is required. Select or create a job description before uploading.",
+      },
+      { status: 400 },
+    );
+  }
+
   const files = formData.getAll("files") as File[];
   if (!files || files.length === 0) {
     return NextResponse.json(
@@ -43,9 +60,8 @@ export async function POST(
   const errors: string[] = [];
 
   for (const file of files) {
-    // Validate file type and size before touching the content
     if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
-      errors.push(`${file.name}: unsupported file type "${file.type}". Upload PDF or plain text.`);
+      errors.push(`${file.name}: unsupported type "${file.type}". Upload PDF or plain text.`);
       continue;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -64,11 +80,12 @@ export async function POST(
         rawText = extractPlainText(buffer);
       }
 
-      // Step 2: LLM extraction (with Zod validation + retry built in)
+      // Step 2: LLM extraction (Zod validation + retry built in)
       const structuredData = await extractResumeData(rawText);
 
-      // Step 3: Persist to DB
+      // Step 3: Persist to DB, scoped to the active job description
       const stored = await insertResume({
+        job_description_id,
         filename: file.name,
         raw_text: rawText,
         structured_json: structuredData,
@@ -81,12 +98,13 @@ export async function POST(
       } else if (err instanceof ExtractionError) {
         errors.push(`${file.name}: LLM extraction failed — ${err.message}`);
       } else {
-        errors.push(`${file.name}: unexpected error — ${err instanceof Error ? err.message : "unknown"}`);
+        errors.push(
+          `${file.name}: unexpected error — ${err instanceof Error ? err.message : "unknown"}`,
+        );
       }
     }
   }
 
-  // If nothing succeeded, return an error response
   if (results.length === 0) {
     return NextResponse.json(
       { data: null, error: errors.join(" | ") },
@@ -94,24 +112,35 @@ export async function POST(
     );
   }
 
-  // Partial success: return results with errors in the response body
-  return NextResponse.json(
-    {
-      data: results,
-      error: errors.length > 0 ? errors.join(" | ") : null,
-    },
-    { status: 200 },
-  );
+  return NextResponse.json({
+    data: results,
+    error: errors.length > 0 ? errors.join(" | ") : null,
+  });
 }
 
-export async function GET(): Promise<NextResponse<ApiResponse<StoredResume[]>>> {
+export async function GET(
+  req: NextRequest,
+): Promise<NextResponse<ApiResponse<StoredResume[]>>> {
+  const { searchParams } = new URL(req.url);
+  const job_description_id = searchParams.get("job_description_id");
+
+  if (!job_description_id) {
+    return NextResponse.json(
+      { data: null, error: "job_description_id query parameter is required." },
+      { status: 400 },
+    );
+  }
+
   try {
-    const { getAllResumes } = await import("@/lib/db/resumes");
-    const resumes = await getAllResumes();
+    const resumes = await getResumesByJobDescription(job_description_id);
     return NextResponse.json({ data: resumes, error: null });
   } catch (err) {
     return NextResponse.json(
-      { data: null, error: err instanceof Error ? err.message : "Failed to fetch resumes." },
+      {
+        data: null,
+        error:
+          err instanceof DbError ? err.message : "Failed to fetch resumes.",
+      },
       { status: 500 },
     );
   }

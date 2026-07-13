@@ -39,6 +39,8 @@ export interface ResumeData {
 /** Row shape as returned from the `resumes` Supabase table. */
 export interface StoredResume {
   id: string;
+  /** The job description this resume was uploaded for. */
+  job_description_id: string;
   filename: string;
   raw_text: string;
   structured_json: ResumeData;
