@@ -188,8 +188,7 @@ export function JobDescriptionPanel({
               <option value="">— Create new —</option>
               {savedJobs.map((job) => (
                 <option key={job.id} value={job.id}>
-                  {job.title}{" "}
-                  ({new Date(job.created_at).toLocaleDateString()})
+                  {job.title}
                 </option>
               ))}
             </select>
@@ -208,7 +207,7 @@ export function JobDescriptionPanel({
             </label>
             <input
               id="job-title"
-              className="input-base"
+              className="input-base text-[11px]"
               type="text"
               placeholder="e.g. Senior Backend Engineer"
               value={title}
