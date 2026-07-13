@@ -5,49 +5,49 @@
 @tailwind utilities;
 
 /* ============================================================
-   Design tokens — Candidate Dossier aesthetic.
-   Warm parchment base, deep navy ink, stamp-red accent only
-   for shortlist, sage/clay for matched/missing skills.
+   Design tokens — Candidate Dossier aesthetic (Cooler Paper Edition).
+   Cooler off-white background, strong near-black text, warm tan
+   borders, dividers, and secondary label accents.
    ============================================================ */
 :root {
-  /* Parchment backgrounds */
-  --bg-base:        #EFE8D8;   /* warm parchment */
-  --bg-surface:     #E8E0CC;   /* slightly darker parchment for panels */
-  --bg-card:        #F4EFE4;   /* lighter card surface */
-  --bg-card-hover:  #EDE6D6;   /* subtle hover darkening */
-  --bg-input:       #EBE4D4;   /* input fields */
+  /* Cooler off-white paper backgrounds */
+  --bg-base:        #F5F4F0;   /* cool off-white paper */
+  --bg-surface:     #EDECE6;   /* slightly darker cool grey-beige for panels/header */
+  --bg-card:        #FAF9F6;   /* clean paper white card surface */
+  --bg-card-hover:  #F2F1EC;   /* subtle hover state */
+  --bg-input:       #FAF9F6;   /* clean paper white inputs */
 
-  /* Ink / text */
-  --text-primary:   #1C2438;   /* deep navy — main ink */
-  --text-secondary: #4A5568;   /* mid-tone navy */
-  --text-muted:     #8896A8;   /* faint ink for metadata */
+  /* Strong near-black ink / text */
+  --text-primary:   #171512;   /* strong near-black main ink */
+  --text-secondary: #423E38;   /* charcoal secondary ink */
+  --text-muted:     #8C8273;   /* warm tan-brown for metadata/label secondary text */
 
-  /* Structural lines — hairline, low contrast */
-  --border:         rgba(28, 36, 56, 0.12);
-  --border-strong:  rgba(28, 36, 56, 0.22);
-  --border-focus:   rgba(28, 36, 56, 0.45);
+  /* Structural lines — warm tan / brown hairline borders */
+  --border:         rgba(140, 130, 115, 0.22); /* warm tan border */
+  --border-strong:  rgba(140, 130, 115, 0.42); /* stronger tan divider */
+  --border-focus:   rgba(23, 21, 18, 0.70);    /* near-black focus borders */
 
   /* Stamp red — ONLY for shortlist marking */
   --stamp-red:      #B23A2E;
   --stamp-red-dim:  rgba(178, 58, 46, 0.10);
 
   /* Matched skills — sage green */
-  --skill-matched-bg:     rgba(92, 122, 92, 0.12);
+  --skill-matched-bg:     rgba(92, 122, 92, 0.10);
   --skill-matched-text:   #3D6B3D;
-  --skill-matched-border: rgba(92, 122, 92, 0.35);
+  --skill-matched-border: rgba(92, 122, 92, 0.30);
 
   /* Missing skills — muted clay */
-  --skill-missing-bg:     rgba(166, 107, 79, 0.10);
+  --skill-missing-bg:     rgba(166, 107, 79, 0.08);
   --skill-missing-text:   #8B4A2E;
-  --skill-missing-border: rgba(166, 107, 79, 0.30);
+  --skill-missing-border: rgba(166, 107, 79, 0.25);
 
-  /* Score gauge palette — navy track + semantic arc */
-  --gauge-track:    rgba(28, 36, 56, 0.10);
-  --gauge-low:      #B23A2E;   /* clay-red for low scores */
-  --gauge-mid:      #A66B4F;   /* muted clay for mid */
-  --gauge-high:     #5C7A5C;   /* sage green for high */
+  /* Score gauge palette */
+  --gauge-track:    rgba(23, 21, 18, 0.08);
+  --gauge-low:      #B23A2E;
+  --gauge-mid:      #A66B4F;
+  --gauge-high:     #5C7A5C;
 
-  /* Status */
+  /* Status states */
   --error:          #B23A2E;
   --success:        #5C7A5C;
   --warning:        #A66B4F;
@@ -79,8 +79,8 @@
         0deg,
         transparent,
         transparent 24px,
-        rgba(28, 36, 56, 0.018) 24px,
-        rgba(28, 36, 56, 0.018) 25px
+        rgba(23, 21, 18, 0.015) 24px,
+        rgba(23, 21, 18, 0.015) 25px
       );
   }
 
@@ -93,10 +93,10 @@
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: var(--bg-surface); }
   ::-webkit-scrollbar-thumb {
-    background: rgba(28, 36, 56, 0.25);
+    background: rgba(23, 21, 18, 0.20);
     border-radius: 2px;
   }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(28, 36, 56, 0.4); }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(23, 21, 18, 0.35); }
 
   *:focus-visible {
     outline: 2px solid var(--border-focus);
