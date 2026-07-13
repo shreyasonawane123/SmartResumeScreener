@@ -1,6 +1,4 @@
-import type { Config } from "jest";
-
-const config: Config = {
+const config = {
   // Use ts-jest to handle TypeScript source files
   preset: "ts-jest",
 
@@ -26,7 +24,7 @@ const config: Config = {
 
   // Register @testing-library/jest-dom custom matchers (toBeInTheDocument etc.)
   // after the test framework is set up in jsdom
-  setupFilesAfterFramework: ["@testing-library/jest-dom"],
+  setupFilesAfterEnv: ["@testing-library/jest-dom"],
 };
 
 export default config;

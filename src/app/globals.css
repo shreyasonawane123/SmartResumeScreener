@@ -2,25 +2,274 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   Design tokens — dark-first, with a slate/indigo/violet palette.
+   Named variables so all components reference the same values.
+   ============================================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Backgrounds */
+  --bg-base: #0d0f14;
+  --bg-surface: #141720;
+  --bg-card: #1a1e2e;
+  --bg-card-hover: #1e2336;
+  --bg-input: #1a1e2e;
+  --bg-overlay: rgba(13, 15, 20, 0.7);
+
+  /* Borders */
+  --border: rgba(255, 255, 255, 0.07);
+  --border-focus: rgba(139, 92, 246, 0.5);
+
+  /* Text */
+  --text-primary: #f0f2f8;
+  --text-secondary: #8b93b0;
+  --text-muted: #4d5475;
+
+  /* Brand colors */
+  --accent: #7c3aed;         /* violet-600 */
+  --accent-bright: #8b5cf6;  /* violet-500 */
+  --accent-glow: rgba(124, 58, 237, 0.25);
+
+  /* Shortlisted gold */
+  --gold: #f59e0b;
+  --gold-dim: rgba(245, 158, 11, 0.15);
+
+  /* Matched skills */
+  --skill-matched-bg: rgba(34, 197, 94, 0.12);
+  --skill-matched-text: #4ade80;
+  --skill-matched-border: rgba(34, 197, 94, 0.25);
+
+  /* Missing skills */
+  --skill-missing-bg: rgba(239, 68, 68, 0.1);
+  --skill-missing-text: #f87171;
+  --skill-missing-border: rgba(239, 68, 68, 0.2);
+
+  /* Score gauge colors: gradient from red → amber → green */
+  --gauge-low: #ef4444;
+  --gauge-mid: #f59e0b;
+  --gauge-high: #22c55e;
+
+  /* Status states */
+  --error: #f87171;
+  --success: #4ade80;
+  --warning: #fbbf24;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ============================================================
+   Base resets
+   ============================================================ */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: "Inter", system-ui, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-surface);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+  }
+
+  /* Focus ring */
+  *:focus-visible {
+    outline: 2px solid var(--accent-bright);
+    outline-offset: 2px;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+/* ============================================================
+   Reusable component classes
+   ============================================================ */
+@layer components {
+  /* Glassmorphism card */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .card:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Input fields */
+  .input-base {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    width: 100%;
+    resize: none;
+  }
+
+  .input-base::placeholder {
+    color: var(--text-muted);
+  }
+
+  .input-base:focus {
+    outline: none;
+    border-color: var(--accent-bright);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  /* Primary action button */
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent) 0%, #6d28d9 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;
+    letter-spacing: 0.01em;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    opacity: 0.9;
+    box-shadow: 0 4px 20px var(--accent-glow);
+    transform: translateY(-1px);
+  }
+
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Secondary button */
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    border-color: var(--accent-bright);
+    color: var(--text-primary);
+  }
+
+  /* Section label */
+  .label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  /* Shortlist section header — gold accent */
+  .section-header-shortlisted {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--gold);
+    padding: 8px 0;
+  }
+
+  .section-header-other {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 8px 0;
+  }
 }
 
+/* ============================================================
+   Animations
+   ============================================================ */
 @layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease forwards;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-gauge {
+    animation: gaugeFill 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+  }
+
+  .animate-pulse-soft {
+    animation: pulse-soft 1.5s ease infinite;
+  }
+
+  /* Drag-and-drop active state */
+  .drag-active {
+    border-color: var(--accent-bright) !important;
+    background: rgba(124, 58, 237, 0.06) !important;
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
   .text-balance {
     text-wrap: balance;
   }

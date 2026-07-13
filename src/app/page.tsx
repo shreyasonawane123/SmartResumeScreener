@@ -1,101 +1,176 @@
-import Image from "next/image";
+"use client";
+
+// ============================================================
+// app/page.tsx
+//
+// Root dashboard layout. Features a beautiful split-view:
+// - Left: Job details form + resume uploader
+// - Right: Live score results split into Shortlisted vs Others
+// ============================================================
+
+import { useState, useEffect } from "react";
+import { JobDescriptionPanel } from "@/components/JobDescriptionPanel";
+import { ResumeUploader } from "@/components/ResumeUploader";
+import { CandidateList } from "@/components/CandidateList";
+import { ProgressStepper } from "@/components/ProgressStepper";
+import { ErrorBanner } from "@/components/ErrorBanner";
+import { DEFAULT_SHORTLIST_THRESHOLD } from "@/lib/constants";
+import type { CandidateScore, StoredResume, ProcessingStep } from "@/lib/types";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [resumes, setResumes] = useState<StoredResume[]>([]);
+  const [candidates, setCandidates] = useState<CandidateScore[]>([]);
+  const [threshold, setThreshold] = useState(DEFAULT_SHORTLIST_THRESHOLD);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
+  // Error and Loading/Pipeline States
+  const [error, setError] = useState<string | null>(null);
+  const [pipelineStep, setPipelineStep] = useState<ProcessingStep>("idle");
+  const [activeFilename, setActiveFilename] = useState<string>("");
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
+
+  // Load existing resumes from database on mount
+  useEffect(() => {
+    async function loadResumes() {
+      try {
+        const res = await fetch("/api/resumes");
+        const json = await res.json();
+        if (json.data) {
+          setResumes(json.data);
+        }
+      } catch (err) {
+        console.error("Failed to load existing resumes:", err);
+      }
+    }
+    loadResumes();
+  }, []);
+
+  // Handle new resume upload successes
+  const handleUploadSuccess = (newResumes: StoredResume[]) => {
+    setResumes((prev) => {
+      // Deduplicate by filename
+      const filtered = prev.filter((r) => !newResumes.some((nr) => nr.filename === r.filename));
+      return [...newResumes, ...filtered];
+    });
+  };
+
+  // Run the full LLM scoring workflow
+  const handleAnalyze = async (jobId: string) => {
+    if (resumes.length === 0) {
+      setError("Please upload at least one resume on the left first.");
+      return;
+    }
+
+    setIsLoadingCandidates(true);
+    setPipelineStep("scoring");
+    setError(null);
+
+    try {
+      const res = await fetch("/api/scores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job_description_id: jobId }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        throw new Error(json.error || "Analysis pipeline failed during scoring.");
+      }
+
+      setCandidates(json.data || []);
+      setPipelineStep("done");
+
+      // Reset step to idle after a few seconds of visual completion
+      setTimeout(() => setPipelineStep("idle"), 3000);
+    } catch (err) {
+      setPipelineStep("error");
+      setError(err instanceof Error ? err.message : "Pipeline failed.");
+    } finally {
+      setIsLoadingCandidates(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      {/* Premium Header bar */}
+      <header className="border-b border-[var(--border)] bg-[var(--bg-surface)] py-4 px-6 md:px-8 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[var(--accent)] to-[#6d28d9] flex items-center justify-center font-bold text-white shadow-[0_0_12px_var(--accent-glow)]">
+            S
+          </div>
+          <div>
+            <h1 className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
+              SmartResume Screener
+            </h1>
+            <p className="text-[10px] text-[var(--text-secondary)] font-medium">
+              Vercel Serverless Core • Claude 3.5 Sonnet
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <span className="text-xs text-[var(--text-secondary)] hidden sm:inline-flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
+            Supabase connected
+          </span>
           <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            href="https://github.com"
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noreferrer"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors text-xs font-semibold border border-[var(--border)] rounded-md px-2.5 py-1"
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
+            GitHub
           </a>
         </div>
+      </header>
+
+      {/* Main split-view dashboard */}
+      <main className="flex-1 max-w-[1440px] w-full mx-auto p-6 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left column (Job Inputs & Uploads) — Col 5 */}
+        <section className="lg:col-span-5 flex flex-col gap-6">
+          <JobDescriptionPanel
+            threshold={threshold}
+            onThresholdChange={setThreshold}
+            onAnalyze={handleAnalyze}
+            isAnalyzing={isLoadingCandidates}
+            onSetError={setError}
+          />
+
+          <ResumeUploader
+            onUploadSuccess={handleUploadSuccess}
+            onSetError={setError}
+            existingResumeCount={resumes.length}
+          />
+        </section>
+
+        {/* Right column (Results List) — Col 7 */}
+        <section className="lg:col-span-7 flex flex-col">
+          {/* Global Pipeline Error message */}
+          <ErrorBanner message={error} onClear={() => setError(null)} />
+
+          {/* Active processing step feedback */}
+          <ProgressStepper step={pipelineStep} filename={activeFilename} />
+
+          {/* Candidate Lists */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
+              <h2 className="text-sm font-bold text-[var(--text-primary)] tracking-wide uppercase">
+                Ranking Results
+              </h2>
+              {candidates.length > 0 && (
+                <span className="text-xs text-[var(--text-secondary)]">
+                  Sorted by Score (Descending)
+                </span>
+              )}
+            </div>
+
+            <CandidateList
+              candidates={candidates}
+              threshold={threshold}
+              isLoading={isLoadingCandidates}
+            />
+          </div>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
