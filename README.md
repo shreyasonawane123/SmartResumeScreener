@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SmartResume Screener
 
-## Getting Started
+A developer-friendly screening dashboard that parses PDF/text resumes, extracts structured profiles, and ranks candidates against a job description using structured LLM calls and a configurable shortlisting threshold.
 
-First, run the development server:
+## Architecture Overview
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+                      +-------------------+
+                      |   User Dashboard  |
+                      |   (Next.js App)   |
+                      +----+---------+----+
+                           |         ^
+          1. Upload Resume |         | 4. Ranked List
+                           v         |
+                     +-----+---------+----+
+                     |  Next.js API Route |
+                     |  (/app/api/*)      |
+                     +-----+---------+----+
+                           |         |
+      2. Parse & Extract   |         | 3. Store Structured
+      (Claude Tool Use)    v         |    Data & Scores
+                     +-----+---------+----+
+                     |  Anthropic API     | <--->  Supabase DB
+                     |  (claude-sonnet-5) |        (PostgreSQL)
+                     +--------------------+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Separation of Concerns
+- **`/lib/parsing/`**: Serverless-safe text extraction from PDF and plain text buffers. PDF parsing utilizes `unpdf` (wrapping `pdf.js` with zero native dependencies) to avoid container/serverless canvas binary crashes.
+- **`/lib/llm/`**: Anthropic client integration and business logic for schema extraction and candidate scoring.
+- **`/lib/db/`**: CRUD operations on Postgres via the Supabase JS client.
+- **`/app/api/`**: Request/response wrappers only. The API routes do not contain business or data logic, making the parsing and scoring layers independently testable.
+- **`/components/`**: Modular frontend UI widgets built with Tailwind CSS.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## LLM Prompts & Structured Validation
 
-## Learn More
+The app uses two separate prompts rather than one mega-prompt. This keeps individual tasks simple for the model, reduces token usage on re-scoring, and makes it easy to explain or audit.
 
-To learn more about Next.js, take a look at the following resources:
+Both prompts are defined in [`src/lib/llm/prompts.ts`](file:///src/lib/llm/prompts.ts).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 1. Resume Extraction Prompt
+Converts raw, unstructured resume text into a structured profile schema.
+- **Why it's structured this way**: It provides an explicit TypeScript-mirror output schema, a few-shot worked example to align format expectations (especially converting text durations into numbers), and instructions to reason step-by-step internally.
+- **Tool Use Constraints**: Rather than relying on Claude to output valid JSON in markdown blocks, we use the Anthropic Tool Use API, forcing the model to respond by calling a schema-validated tool: `extract_resume_data`.
+- **Validation & Retry**: The backend validates the model's output using Zod. If the model outputs bad schema structures, the system automatically retries once by appending the Zod validation issues back to the prompt, allowing the model to self-correct.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 2. Candidate Scoring Prompt
+Rates candidate fit on a 1–10 scale against a job description.
+- **Why it's structured this way**: Inputs are passed as pre-structured JSON (reducing noise). It specifies score calibration (1–3 for major gaps, 4–6 for partial fit, 7–8 for good fit, 9–10 for excellent fit) to prevent score drift, and requires both matched and missing skill lists to drive frontend chips.
+- **Tool Use Constraints**: Forces response using the `score_candidate` tool.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Setup & Running Locally
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 1. Database Setup
+Create a free project at [supabase.com](https://supabase.com). Go to the SQL Editor and execute the schema stub found in [`supabase/schema.sql`](file:///supabase/schema.sql). This will provision:
+- `resumes` table: Stores filename, raw text, and structured profile JSON.
+- `job_descriptions` table: Stores titles and requirements.
+- `scores` table: Stores computed scores, justifications, matched, and missing skills.
+
+### 2. Environment Configuration
+Copy the template to create a local environment file:
+```bash
+cp .env.example .env.local
+```
+Fill in the credentials in `.env.local`:
+- `ANTHROPIC_API_KEY`: Your Anthropic developer console API key.
+- `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL.
+- `SUPABASE_SERVICE_ROLE_KEY`: Service role API key (used server-side for database write bypass).
+
+### 3. Install & Run
+Install packages:
+```bash
+npm install
+```
+Start the Next.js development server:
+```bash
+npm run dev
+```
+Open `http://localhost:3000` to view the dashboard.
+
+---
+
+## Testing & Verifying
+
+We write unit tests to verify parsing, validation retries, and scoring.
+
+Run the test suite:
+```bash
+npm test
+```
+
+Check TypeScript compilation:
+```bash
+npm run type-check
+```
+
+---
+
+## Known Limitations
+
+- **Scanned Resumes**: The PDF text extractor runs entirely in memory without OCR. Scanned/image-only PDFs will fail with an extraction warning. Resumes must contain extractable text characters.
+- **API Call Timeouts**: Scoring is performed sequentially. In production environments with a high volume of resumes, serverless function timeouts (typically 10s on Vercel Hobby plan) can be triggered. For larger batches, this should be refactored into a background worker queue.
+- **Tokens/Cost**: Running two-stage LLM extraction and scoring calls on every upload accumulates token usage. The app mitigates this by storing structured JSON in Supabase so scoring can be run and adjusted without re-extracting resume structures.
