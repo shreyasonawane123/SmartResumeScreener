@@ -34,7 +34,7 @@ An evaluation tool that handles structured resume parsing and match scoring agai
 
 ### Separation of Concerns
 - **`/src/lib/parsing/`**: Handles text extraction from uploads. Relies on `unpdf` instead of the traditional `pdf-parse` package because `unpdf` compiles with zero native binary bindings, preventing canvas dependency load failures in Vercel serverless environments.
-- **`/src/lib/llm/`**: Manages the Groq client configuration, prompt structures, and structured output handling via `response_format: { type: "json_schema" }` � which forces the model to emit valid, schema-constrained JSON without relying on markdown prose blocks.
+- **`/src/lib/llm/`**: Manages the Groq client configuration, prompt structures, and structured output handling via `response_format: { type: "json_schema" }` — which forces the model to emit valid, schema-constrained JSON without relying on markdown prose blocks.
 - **`/src/lib/db/`**: Handles direct Supabase CRUD database transactions.
 - **`/src/app/api/`**: Simple request/response route endpoints. All logic is decoupled into `/lib` so that parsing, scoring, and database transactions can be unit tested without spawning the Next.js runtime.
 - **`/src/components/`**: Clean Tailwind UI components. Stateful dashboard assembly is delegated to `src/app/page.tsx` to keep individual components highly reusable.
@@ -55,19 +55,134 @@ Both prompts are defined in `src/lib/llm/prompts.ts`.
 ### 1. Resume Extraction Prompt
 Converts raw, unstructured resume text into a structured profile schema.
 - **Why it's structured this way**: It provides an explicit TypeScript-mirror output schema, a few-shot worked example to align format expectations (especially converting text durations into numbers), and instructions to reason step-by-step internally.
-- **Structured JSON Schema**: Rather than relying on the model to output valid JSON in markdown prose blocks, we configure the Groq request with `response_format: { type: "json_schema", json_schema: { ... } }`, which instructs the model to produce output strictly conforming to a declared JSON Schema object. This is Groq's constrained-generation mode � analogous to OpenAI's structured outputs � and is more reliable than plain `json_object` mode because the schema itself is enforced, not just JSON syntax.
+- **Structured JSON Schema**: Rather than relying on the model to output valid JSON in markdown prose blocks, we configure the Groq request with `response_format: { type: "json_schema", json_schema: { ... } }`, which instructs the model to produce output strictly conforming to a declared JSON Schema object. This is Groq's constrained-generation mode — analogous to OpenAI's structured outputs — and is more reliable than plain `json_object` mode because the schema itself is enforced, not just JSON syntax.
 - **Validation & Retry**: The backend validates the model's output using Zod. If the model outputs bad schema structures, the system automatically retries once by sending the Zod validation issues back in the message thread, allowing the model to self-correct.
 
+#### Actual Prompt Text (System Prompt)
+```
+You are a resume parser. Your job is to extract structured information from resume text.
+
+OUTPUT SCHEMA:
+{
+  "name": string,           // candidate's full name
+  "skills": string[],       // technical and soft skills, each as a short phrase
+  "experience": [
+    {
+      "role": string,       // job title
+      "company": string,    // employer name
+      "years": number       // duration in years (e.g. 2.5); use 0 if not stated
+    }
+  ],
+  "education": [
+    {
+      "degree": string,     // e.g. "B.S. Computer Science", "MBA"
+      "institution": string // university or school name
+    }
+  ]
+}
+
+RULES:
+- Extract only what is explicitly stated. Do not infer or fabricate.
+- Skills should be atomic (e.g. "React" not "React, Node.js, TypeScript").
+- If a field has no data in the resume, use an empty array [] or empty string "".
+- Reason through the resume section by section internally, then emit ONLY the final JSON.
+
+EXAMPLE:
+
+Input resume text:
+---
+Jane Smith
+jane.smith@email.com | github.com/jsmith
+
+SKILLS: Python, SQL, Pandas, scikit-learn, Tableau, Git
+
+EXPERIENCE:
+Data Analyst — Acme Corp (2020–2023)
+- Built dashboards in Tableau for sales pipeline tracking
+- Wrote Python ETL scripts processing 5M rows/day
+
+Junior Analyst — Beta Inc (2018–2020)
+
+EDUCATION:
+B.S. Statistics, University of Michigan, 2018
+---
+
+Expected output:
+{
+  "name": "Jane Smith",
+  "skills": ["Python", "SQL", "Pandas", "scikit-learn", "Tableau", "Git"],
+  "experience": [
+    { "role": "Data Analyst", "company": "Acme Corp", "years": 3 },
+    { "role": "Junior Analyst", "company": "Beta Inc", "years": 2 }
+  ],
+  "education": [
+    { "degree": "B.S. Statistics", "institution": "University of Michigan" }
+  ]
+}
+```
+
 ### 2. Candidate Scoring Prompt
-Rates candidate fit on a 1�10 scale against a job description.
-- **Why it's structured this way**: Inputs are passed as pre-structured JSON (reducing noise). It specifies score calibration (1�3 for major gaps, 4�6 for partial fit, 7�8 for good fit, 9�10 for excellent fit) to prevent score drift, and requires both matched and missing skill lists to drive frontend chips.
+Rates candidate fit on a 1–10 scale against a job description.
+- **Why it's structured this way**: Inputs are passed as pre-structured JSON (reducing noise). It specifies score calibration (1–3 for major gaps, 4–6 for partial fit, 7–8 for good fit, 9–10 for excellent fit) to prevent score drift, and requires both matched and missing skill lists to drive frontend chips.
 - **Structured JSON Schema**: Configured with `response_format: { type: "json_schema", json_schema: { ... } }` on the request, enforcing that the score, justification, matched skills, and missing skills fields are all present and correctly typed in the model's response.
+
+#### Actual Prompt Text (System Prompt)
+```
+You are a technical recruiter scoring how well a candidate fits a job description.
+
+Given a candidate's structured resume data and a job description, rate the fit on a 1–10 scale.
+
+OUTPUT SCHEMA:
+{
+  "score": number,             // 1 (very poor fit) to 10 (excellent fit), integer or one decimal
+  "justification": string,     // 2–4 sentences explaining the score; be specific, not generic
+  "matched_skills": string[],  // skills from the resume that match the JD requirements
+  "missing_skills": string[]   // skills the JD asks for that the candidate doesn't have
+}
+
+SCORING GUIDE:
+1–3: Major gaps — missing core requirements or substantially under-experienced
+4–6: Partial fit — covers some requirements but notable gaps remain
+7–8: Good fit — meets most requirements with minor gaps
+9–10: Excellent fit — meets or exceeds all core and most secondary requirements
+
+RULES:
+- Reason through the candidate's skills and experience against the JD internally.
+- Then emit ONLY the final JSON. No prose before or after the JSON.
+- Be specific in justification: name actual skills, roles, or years that matter.
+- matched_skills and missing_skills must each be a flat array of short strings.
+
+EXAMPLE:
+
+Candidate (structured JSON):
+{
+  "name": "Jane Smith",
+  "skills": ["Python", "SQL", "Pandas", "scikit-learn", "Tableau", "Git"],
+  "experience": [
+    { "role": "Data Analyst", "company": "Acme Corp", "years": 3 },
+    { "role": "Junior Analyst", "company": "Beta Inc", "years": 2 }
+  ],
+  "education": [{ "degree": "B.S. Statistics", "institution": "University of Michigan" }]
+}
+
+Job description:
+"We need a Senior Data Scientist with 5+ years of experience in Python, ML model 
+deployment, Spark, and cloud platforms (AWS or GCP). Statistics background preferred."
+
+Expected output:
+{
+  "score": 5,
+  "justification": "Jane has strong Python and statistics fundamentals, plus 5 years of data experience total. However, she lacks ML deployment experience, Spark, and any cloud platform skills, which are core requirements for this senior role.",
+  "matched_skills": ["Python", "SQL", "Pandas", "scikit-learn", "Statistics background"],
+  "missing_skills": ["ML model deployment", "Spark", "AWS", "GCP", "5+ years seniority"]
+}
+```
 
 ---
 
 ## Setup & Running Locally
 
-> **Prerequisites**: Node.js 18 or later and npm 9 or later (bundled with Node 18+). All commands use `npm` � do not mix with `yarn` or `pnpm` to avoid lockfile conflicts.
+> **Prerequisites**: Node.js 18 or later and npm 9 or later (bundled with Node 18+). All commands use `npm` — do not mix with `yarn` or `pnpm` to avoid lockfile conflicts.
 
 ### 1. Clone the Repository
 ```bash
@@ -81,9 +196,9 @@ cd smart-resume-screener
 3. Paste the full contents of `supabase/schema.sql` into the editor and click **Run**.
 
 This will provision three tables:
-- **`job_descriptions`** � Stores job titles and requirements text.
-- **`resumes`** � Stores filename, raw text, and structured profile JSON. Includes a `job_description_id` foreign key (`references job_descriptions(id) ON DELETE CASCADE`) so that every resume is permanently scoped to the job it was uploaded for � not a shared global pool. Switching to a different job description only shows candidates uploaded for that specific role.
-- **`scores`** � Stores computed scores, justifications, matched skills, and missing skills for each resume/job pair.
+- **`job_descriptions`** — Stores job titles and requirements text.
+- **`resumes`** — Stores filename, raw text, and structured profile JSON. Includes a `job_description_id` foreign key (`references job_descriptions(id) ON DELETE CASCADE`) so that every resume is permanently scoped to the job it was uploaded for — not a shared global pool. Switching to a different job description only shows candidates uploaded for that specific role.
+- **`scores`** — Stores computed scores, justifications, matched skills, and missing skills for each resume/job pair.
 
 ### 3. Environment Configuration
 Copy the template to create a local environment file:
@@ -145,4 +260,4 @@ By design, candidate resumes are scoped directly to a specific job description (
 - **API Call Timeouts**: Scoring is performed sequentially. In production environments with a high volume of resumes, serverless function timeouts (typically 10s on Vercel Hobby plan) can be triggered. For larger batches, this should be refactored into a background worker queue.
 - **Tokens/Cost**: Running two-stage LLM extraction and scoring calls on every upload accumulates token usage. The app mitigates this by storing structured JSON in Supabase so scoring can be run and adjusted without re-extracting resume structures.
 - **Groq Free-Tier Rate Limits**: Groq's free tier enforces per-minute limits (approximately 30 requests/min and 6,000 tokens/min on `llama-3.3-70b-versatile`). When scoring multiple candidates in one batch, the app introduces a small sequential delay between Groq calls to stay within these limits. If you hit a rate-limit error, wait 60 seconds and retry.
-- **Per-Job Candidate Scoping**: Resumes are intentionally tied to the job description they were uploaded under � there is no shared candidate pool across postings. This mirrors how a real recruiting workflow operates (candidates apply to a specific role), but it means a resume must be re-uploaded if you want to evaluate the same person against a different job opening.
+- **Per-Job Candidate Scoping**: Resumes are intentionally tied to the job description they were uploaded under — there is no shared candidate pool across postings. This mirrors how a real recruiting workflow operates (candidates apply to a specific role), but it means a resume must be re-uploaded if you want to evaluate the same person against a different job opening.
