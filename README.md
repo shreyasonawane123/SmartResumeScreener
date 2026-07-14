@@ -8,6 +8,13 @@ An evaluation tool that handles structured resume parsing and match scoring agai
 
 > The live demo uses a shared Supabase instance and Groq API key. If the Groq free-tier rate limit is hit, wait 60 seconds and retry.
 
+## Demo Video
+
+A short walkthrough of the project — what it does, the architecture, and a live
+demo of the upload → extract → score → shortlist flow:
+
+**[Watch the demo video](https://drive.google.com/file/d/1b4JgwxnsJF7NP13jbLC68oWfcs54kIYg/view?usp=sharing)**
+
 ## Architecture Overview
 
 ```
